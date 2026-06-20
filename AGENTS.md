@@ -58,6 +58,16 @@
 - 对 QML 改动，至少做括号/关键锚点检查，并运行 `build_all.bat`。
 - 对 EXE/DLL 版本发布改动，更新对应版本号、构建、确认产物时间戳，并记录 `CHANGELOG.md`。
 
+## Git 自动提交约定
+
+- 本项目已经接入 git。完成一轮修改并成功构建验证后，默认主动提交一次，不要等用户额外提醒。
+- 提交前必须运行 `git status --short` 和必要的 `git diff --stat` / `git diff --check`，确认只提交本轮代理修改；如果工作区混入用户未说明的改动，只 stage 本轮相关文件，或者先向用户说明。
+- 自动提交优先使用项目脚本：`powershell -NoProfile -ExecutionPolicy Bypass -File .\tools__project_helpers\git_auto_commit.ps1 -Path <file1> <file2>`；确实确认全工作区都是本轮改动时，才允许使用 `-All`。
+- 提交说明由脚本根据 staged diff 自动生成；如果脚本生成的主题不够清楚，代理应传入 `-Message "..."` 写一个简短准确的描述。
+- 提交信息保持短句、可回滚、贴近实际改动，例如 `Fix model preview mojibake`、`Remove legacy skin injection UI`、`Update agent workflow instructions`。
+- 自动提交不等于自动推送。除非用户明确要求 push，默认只提交到本地仓库。
+- 构建失败、编码验证失败、QML 结构检查失败、或变更范围不确定时，不要自动提交；先修复或向用户说明当前阻塞点。
+
 ## PowerShell 使用边界
 
 允许：
