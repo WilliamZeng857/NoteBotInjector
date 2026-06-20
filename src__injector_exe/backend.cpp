@@ -863,8 +863,6 @@ void Backend::refreshModelEntitlementsAsync()
                 const QString finalPath =
                     modelAssetCachePath(remote.modelId, kind, asset.sha256, asset.fileName);
                 if (fileMatchesSha256AndSize(finalPath, asset.sha256, asset.size)) {
-                    logFromThread(QStringLiteral("[MODEL] 本地缓存命中：%1")
-                                      .arg(displayNameOnly(asset.fileName)));
                     *readyPath = finalPath;
                     return true;
                 }
