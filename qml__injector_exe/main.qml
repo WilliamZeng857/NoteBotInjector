@@ -828,19 +828,52 @@ Window {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 42
                     radius: 8
-                    color: Qt.rgba(1, 1, 1, 0.025)
+                    color: modelReplacementTapRestored.pressed
+                           ? (backend.modelModificationEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : Qt.rgba(1, 1, 1, 0.085))
+                           : backend.modelModificationEnabled
+                             ? (modelReplacementHoverRestored.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055))
+                             : (modelReplacementHoverRestored.hovered ? Qt.rgba(1, 1, 1, 0.062) : Qt.rgba(1, 1, 1, 0.025))
                     border.color: backend.modelModificationEnabled
-                                  ? Qt.rgba(0.133, 0.827, 0.933, 0.28)
-                                  : Qt.rgba(1, 1, 1, 0.07)
-                    border.width: 1
+                                  ? (modelReplacementHoverRestored.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.58) : Qt.rgba(0.133, 0.827, 0.933, 0.34))
+                                  : (modelReplacementHoverRestored.hovered ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.07))
+                    border.width: modelReplacementHoverRestored.hovered ? 1.25 : 1
+                    scale: modelReplacementTapRestored.pressed ? 0.982 : modelReplacementHoverRestored.hovered ? 1.01 : 1
+                    transformOrigin: Item.Center
+
+                    Behavior on color { ColorAnimation { duration: 130 } }
+                    Behavior on scale { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
+
+                    Rectangle {
+                        width: modelReplacementTapRestored.pressed ? 5 : modelReplacementHoverRestored.hovered ? 4 : 3
+                        height: parent.height - 14
+                        radius: 2
+                        anchors.left: parent.left
+                        anchors.leftMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: backend.modelModificationEnabled
+                               ? accentCyan
+                               : (modelReplacementHoverRestored.hovered ? textSecondary : textMuted)
+                        opacity: backend.modelModificationEnabled ? 0.92 : 0.55
+                        Behavior on width { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                        Behavior on color { ColorAnimation { duration: 130 } }
+                        Behavior on opacity { NumberAnimation { duration: 130 } }
+                    }
+
+                    HoverHandler {
+                        id: modelReplacementHoverRestored
+                    }
 
                     TapHandler {
+                        id: modelReplacementTapRestored
                         onTapped: backend.modelModificationEnabled = !backend.modelModificationEnabled
                     }
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.margins: 8
+                        anchors.leftMargin: 16
+                        anchors.rightMargin: 8
+                        anchors.topMargin: 8
+                        anchors.bottomMargin: 8
                         spacing: 8
 
                         ColumnLayout {
@@ -850,11 +883,14 @@ Window {
                             Text {
                                 Layout.fillWidth: true
                                 text: "模型替换"
-                                color: textPrimary
+                                color: backend.modelModificationEnabled
+                                       ? (modelReplacementHoverRestored.hovered ? "#CFFAFE" : textPrimary)
+                                       : (modelReplacementHoverRestored.hovered ? textPrimary : textSecondary)
                                 font.pixelSize: 11
                                 font.bold: true
                                 font.family: "Microsoft YaHei UI"
                                 elide: Text.ElideRight
+                                Behavior on color { ColorAnimation { duration: 130 } }
                             }
 
                             Text {
@@ -862,10 +898,13 @@ Window {
                                 text: backend.modelModificationEnabled
                                       ? "开：等待新进程"
                                       : "关：不改启动"
-                                color: textSecondary
+                                color: backend.modelModificationEnabled
+                                       ? (modelReplacementHoverRestored.hovered ? accentCyan : textSecondary)
+                                       : (modelReplacementHoverRestored.hovered ? textSecondary : textMuted)
                                 font.pixelSize: 10
                                 font.family: "Microsoft YaHei UI"
                                 elide: Text.ElideRight
+                                Behavior on color { ColorAnimation { duration: 130 } }
                             }
                         }
 
@@ -877,14 +916,17 @@ Window {
                             color: backend.modelReplacementStatus === "失败"
                                    ? Qt.rgba(0.937, 0.267, 0.267, 0.14)
                                    : backend.modelReplacementRunning
-                                     ? Qt.rgba(0.133, 0.827, 0.933, 0.15)
-                                     : Qt.rgba(1, 1, 1, 0.055)
+                                     ? (modelReplacementHoverRestored.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.22) : Qt.rgba(0.133, 0.827, 0.933, 0.15))
+                                     : (modelReplacementHoverRestored.hovered ? Qt.rgba(1, 1, 1, 0.085) : Qt.rgba(1, 1, 1, 0.055))
                             border.color: backend.modelReplacementStatus === "失败"
                                           ? Qt.rgba(0.937, 0.267, 0.267, 0.34)
                                           : backend.modelReplacementRunning
-                                            ? Qt.rgba(0.133, 0.827, 0.933, 0.36)
-                                            : Qt.rgba(1, 1, 1, 0.10)
+                                            ? (modelReplacementHoverRestored.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.52) : Qt.rgba(0.133, 0.827, 0.933, 0.36))
+                                            : (modelReplacementHoverRestored.hovered ? Qt.rgba(1, 1, 1, 0.18) : Qt.rgba(1, 1, 1, 0.10))
                             border.width: 1
+                            scale: modelReplacementTapRestored.pressed ? 0.96 : 1
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on scale { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
 
                             Text {
                                 anchors.fill: parent
