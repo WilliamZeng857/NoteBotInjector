@@ -65,7 +65,7 @@
 - 自动提交优先使用项目脚本：`powershell -NoProfile -ExecutionPolicy Bypass -File .\tools__project_helpers\git_auto_commit.ps1 -Path <file1> <file2>`；确实确认全工作区都是本轮改动时，才允许使用 `-All`。
 - 提交说明由脚本根据 staged diff 自动生成；如果脚本生成的主题不够清楚，代理应传入 `-Message "..."` 写一个简短准确的描述。
 - 提交信息保持短句、可回滚、贴近实际改动，例如 `Fix model preview mojibake`、`Remove legacy skin injection UI`、`Update agent workflow instructions`。
-- 自动提交不等于自动推送。除非用户明确要求 push，默认只提交到本地仓库。
+- 自动提交后必须继续推送到 GitHub 远端 `origin/main`，不要停在本地 commit；只有用户明确要求“不推送/只本地提交”时才可以跳过 push。
 - 构建失败、编码验证失败、QML 结构检查失败、或变更范围不确定时，不要自动提交；先修复或向用户说明当前阻塞点。
 
 ## PowerShell 使用边界
