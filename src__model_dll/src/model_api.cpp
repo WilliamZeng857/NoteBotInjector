@@ -872,7 +872,7 @@ bool resolveHookAddresses(HANDLE process,
         textSection = sectionContainingRva(sections, base, preferred);
     }
     if (!textSection) {
-        emitLog(QStringLiteral("[MODEL] resolver failed: .text not found"));
+        emitLog(QStringLiteral("[MODEL] 定位替换点失败：模块段不可用"));
         return false;
     }
 
@@ -889,7 +889,7 @@ bool resolveHookAddresses(HANDLE process,
 
     const QByteArray textData = readMem(process, textSection->start, textSection->size);
     if (textData.isEmpty()) {
-        emitLog(QStringLiteral("[MODEL] resolver failed: .text read failed"));
+        emitLog(QStringLiteral("[MODEL] 定位替换点失败：模块读取失败"));
         return false;
     }
 
@@ -980,7 +980,7 @@ bool resolveHookAddresses(HANDLE process,
             }
         }
         if (scored.empty()) {
-            emitLog(QStringLiteral("[MODEL] resolver failed: group %1 not found").arg(QString::fromStdString(group)));
+            emitLog(QStringLiteral("[MODEL] 定位替换点失败：目标字段未匹配"));
             return false;
         }
         std::sort(scored.begin(), scored.end(), [](const Score &a, const Score &b) {
@@ -994,9 +994,6 @@ bool resolveHookAddresses(HANDLE process,
         info.score = scored.front().score;
         info.refs = candidates[info.start];
         groupInfos[group] = info;
-        emitLog(QStringLiteral("[MODEL] resolver group %1 start=%2 score=%3")
-                    .arg(QString::fromStdString(group), hex64(info.start))
-                    .arg(info.score));
     }
 
     std::vector<QString> unresolved;
@@ -1043,17 +1040,8 @@ bool resolveHookAddresses(HANDLE process,
                                    compat.second);
     }
     if (!unresolved.empty()) {
-        QStringList unresolvedNames;
-        unresolvedNames.reserve(static_cast<qsizetype>(unresolved.size()));
-        for (const QString &name : unresolved) {
-            unresolvedNames.append(name);
-        }
-        emitLog(QStringLiteral("[MODEL] resolver incomplete: %1").arg(unresolvedNames.join(QStringLiteral(", "))));
+        emitLog(QStringLiteral("[MODEL] 定位替换点失败：替换点不完整"));
         return false;
-    }
-    for (const HookDef &hook : *hooks) {
-        emitLog(QStringLiteral("[MODEL] hook resolved %1 rva=%2 by=%3")
-                    .arg(hook.name, hex64(hook.address - base), hook.resolvedBy));
     }
     return true;
 }
@@ -1214,11 +1202,11 @@ bool prepareRemotePayload(HANDLE process, const PayloadConfig &cfg, RemotePayloa
         }
         const auto addr = makeRemoteString(process, value);
         if (!addr) {
-            emitLog(QStringLiteral("[MODEL] 无法分配远程字符串：%1").arg(label));
+            Q_UNUSED(label);
+            emitLog(QStringLiteral("[MODEL] 准备替换数据失败：资源分配失败"));
             return false;
         }
         *target = *addr;
-        emitLog(QStringLiteral("[MODEL] remote %1 ready %2").arg(label, hex64(*addr)));
         return true;
     };
     if (!makeText(QStringLiteral("SkinId"), cfg.skinId, &remote->skinId) ||
@@ -1231,13 +1219,13 @@ bool prepareRemotePayload(HANDLE process, const PayloadConfig &cfg, RemotePayloa
     }
     const auto skinObj = makeRemoteStdStringBytes(process, cfg.skinRgba);
     if (!skinObj) {
-        emitLog(QStringLiteral("[MODEL] 无法分配 SkinData 字符串对象"));
+        emitLog(QStringLiteral("[MODEL] 准备替换数据失败：贴图对象分配失败"));
         return false;
     }
     remote->fakeSkinData = *skinObj;
     const auto skinBytes = allocRemote(process, cfg.skinRgba.size(), std::nullopt, false);
     if (!skinBytes) {
-        emitLog(QStringLiteral("[MODEL] 无法分配皮肤贴图远程内存"));
+        emitLog(QStringLiteral("[MODEL] 准备替换数据失败：贴图内存分配失败"));
         return false;
     }
     if (!writeMem(process, *skinBytes, cfg.skinRgba, false)) {
@@ -1246,10 +1234,6 @@ bool prepareRemotePayload(HANDLE process, const PayloadConfig &cfg, RemotePayloa
     }
     remote->replacementSkin = *skinBytes;
     remote->replacementSkinSize = cfg.skinRgba.size();
-    emitLog(QStringLiteral("[MODEL] skin png ready %1x%2 bytes=%3")
-                .arg(cfg.skinWidth)
-                .arg(cfg.skinHeight)
-                .arg(cfg.skinRgba.size()));
     return true;
 }
 
@@ -1263,21 +1247,14 @@ bool installHook(HANDLE process,
     const quint64 addr = hookAddress(base, hook);
     const QByteArray current = readMem(process, addr, 5);
     if (current.startsWith(char(0xE9))) {
-        emitLog(QStringLiteral("[MODEL] hook unexpected jmp %1 addr=%2").arg(hook.name, hex64(addr)));
         return false;
     }
     const auto compat = hookBytesCompatible(addr, current, hook, base, moduleSize);
     if (!compat.first) {
-        emitLog(QStringLiteral("[MODEL] hook bytes not ready %1 addr=%2 actual=%3")
-                    .arg(hook.name, hex64(addr), QString::fromLatin1(current.toHex(' '))));
         return false;
-    }
-    if (compat.second != QStringLiteral("exact")) {
-        emitLog(QStringLiteral("[MODEL] hook call drift accepted %1 %2").arg(hook.name, compat.second));
     }
     const auto shellAddr = allocRemote(process, hook.shellSize, addr, true);
     if (!shellAddr) {
-        emitLog(QStringLiteral("[MODEL] 无法分配附近可执行内存：%1").arg(hook.name));
         return false;
     }
     const quint64 counterAddr = *shellAddr + hook.shellSize - 0x10;
@@ -1312,18 +1289,15 @@ bool installHook(HANDLE process,
     } else {
         const quint64 str = remoteStringForKind();
         if (!str) {
-            emitLog(QStringLiteral("[MODEL] 缺少远程字符串对象：%1").arg(hook.name));
             return false;
         }
         shell = makeStringArgShellcode(callTarget, returnAddr, counterAddr, str);
     }
 
     if (shell.size() >= hook.shellSize - 0x20) {
-        emitLog(QStringLiteral("[MODEL] 跳板太大：%1 size=%2").arg(hook.name).arg(shell.size()));
         return false;
     }
     if (!writeMem(process, *shellAddr, shell, true)) {
-        emitLog(QStringLiteral("[MODEL] 写入跳板失败：%1").arg(hook.name));
         return false;
     }
     QByteArray zero(8, '\0');
@@ -1331,11 +1305,8 @@ bool installHook(HANDLE process,
     bool jmpOk = false;
     const QByteArray jmp = makeJmp5(addr, *shellAddr, &jmpOk);
     if (!jmpOk || !writeMem(process, addr, jmp, true)) {
-        emitLog(QStringLiteral("[MODEL] 写入 JMP 失败：%1").arg(hook.name));
         return false;
     }
-    emitLog(QStringLiteral("[MODEL] hook installed %1 addr=%2 shell=%3")
-                .arg(hook.name, hex64(addr), hex64(*shellAddr)));
     *counterOut = counterAddr;
     return true;
 }
@@ -1380,27 +1351,25 @@ bool patchProcess(DWORD pid, const PayloadConfig &cfg)
     emitState("model_state", QStringLiteral("正在准备替换"));
     ProcessHandle process = openProcess(pid, true);
     if (!process) {
-        emitLog(QStringLiteral("[MODEL] OpenProcess 失败，可能权限不够 PID=%1").arg(pid));
+        emitLog(QStringLiteral("[MODEL] 打开游戏进程失败，可能权限不够"));
         return false;
     }
     const qint64 moduleDeadline = QDateTime::currentMSecsSinceEpoch() + 30000;
     std::optional<ModuleInfo> module;
     while (QDateTime::currentMSecsSinceEpoch() < moduleDeadline) {
         if (!processAlive(process.h)) {
-            emitLog(QStringLiteral("[MODEL] 游戏进程已退出 PID=%1").arg(pid));
+            emitLog(QStringLiteral("[MODEL] 游戏进程已退出"));
             return false;
         }
         module = getModuleBase(process.h);
         if (module) {
-            emitLog(QStringLiteral("[MODEL] 模块已就绪 base=%1 size=%2")
-                        .arg(hex64(module->base))
-                        .arg(module->size));
+            emitLog(QStringLiteral("[MODEL] 模块已就绪"));
             break;
         }
         QThread::msleep(20);
     }
     if (!module) {
-        emitLog(QStringLiteral("[MODEL] 找不到 Minecraft.Windows.exe 模块"));
+        emitLog(QStringLiteral("[MODEL] 找不到游戏主模块"));
         return false;
     }
 
@@ -1411,7 +1380,6 @@ bool patchProcess(DWORD pid, const PayloadConfig &cfg)
 
     std::vector<HookDef> hooks = selectedHooks(cfg);
     if (!resolveHookAddresses(process.h, module->base, module->size, &hooks)) {
-        emitLog(QStringLiteral("[MODEL] name-anchored resolver failed"));
         return false;
     }
 
@@ -1419,7 +1387,7 @@ bool patchProcess(DWORD pid, const PayloadConfig &cfg)
     const qint64 hookDeadline = QDateTime::currentMSecsSinceEpoch() + cfg.hookTimeoutMs;
     while (QDateTime::currentMSecsSinceEpoch() < hookDeadline && counters.size() < hooks.size()) {
         if (!processAlive(process.h)) {
-            emitLog(QStringLiteral("[MODEL] 游戏进程已退出 PID=%1").arg(pid));
+            emitLog(QStringLiteral("[MODEL] 游戏进程已退出"));
             return false;
         }
         for (const HookDef &hook : hooks) {
@@ -1444,9 +1412,11 @@ bool patchProcess(DWORD pid, const PayloadConfig &cfg)
     for (const HookDef &hook : hooks) {
         if (counters.find(hook.name.toStdString()) == counters.end()) {
             ++missing;
-            emitLog(QStringLiteral("[MODEL] hook timeout %1").arg(hook.name));
         }
     }
+    emitLog(QStringLiteral("[MODEL] 修改点安装完成：%1/%2")
+                .arg(static_cast<qulonglong>(counters.size()))
+                .arg(static_cast<qulonglong>(hooks.size())));
     if (counters.empty()) {
         return false;
     }
@@ -1455,7 +1425,7 @@ bool patchProcess(DWORD pid, const PayloadConfig &cfg)
     const qint64 hitDeadline = QDateTime::currentMSecsSinceEpoch() + cfg.hitTimeoutMs;
     while (QDateTime::currentMSecsSinceEpoch() < hitDeadline && hitSeen.size() < counters.size()) {
         if (!processAlive(process.h)) {
-            emitLog(QStringLiteral("[MODEL] 游戏进程已退出 PID=%1").arg(pid));
+            emitLog(QStringLiteral("[MODEL] 游戏进程已退出"));
             break;
         }
         for (const auto &pair : counters) {
@@ -1465,9 +1435,6 @@ bool patchProcess(DWORD pid, const PayloadConfig &cfg)
             const auto value = readU64Remote(process.h, pair.second);
             if (value && *value > 0) {
                 hitSeen.push_back(pair.first);
-                emitLog(QStringLiteral("[MODEL] hook hit %1 count=%2")
-                            .arg(QString::fromStdString(pair.first))
-                            .arg(*value));
             }
         }
         QThread::msleep(20);
@@ -1547,7 +1514,7 @@ private:
     {
         emitState("model_running", QStringLiteral("true"));
         m_waitingForProcess.store(true);
-        emitState("model_state", QStringLiteral("等待游戏进程启动"));
+        emitState("model_state", QStringLiteral("正在运行"));
         emitLog(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动"));
 
         std::vector<DWORD> baseline = enumTargetPids();
@@ -1568,14 +1535,14 @@ private:
                     continue;
                 }
                 m_waitingForProcess.store(false);
-                emitLog(QStringLiteral("[MODEL] 找到可替换的新进程 PID=%1").arg(pid));
+                emitLog(QStringLiteral("[MODEL] 找到可替换的新进程"));
                 const bool ok = patchProcess(pid, cfg);
                 emitState("model_state", ok ? QStringLiteral("本次替换完成") : QStringLiteral("失败"));
                 if (m_stopRequested.load()) {
                     break;
                 }
                 m_waitingForProcess.store(true);
-                emitState("model_state", QStringLiteral("等待游戏进程启动"));
+                emitState("model_state", QStringLiteral("正在运行"));
                 baseline = enumTargetPids();
             }
             QThread::msleep(50);

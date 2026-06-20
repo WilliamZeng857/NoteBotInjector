@@ -87,8 +87,12 @@ static QString sanitizeUiLogMessage(QString msg)
 {
     static const QRegularExpression urlRe(QStringLiteral("https?://\\S+"));
     static const QRegularExpression winPathRe(QStringLiteral("([A-Za-z]:[\\\\/][^\\s\\r\\n]+)"));
+    static const QRegularExpression hexAddressRe(QStringLiteral("\\b0x[0-9A-Fa-f]{6,}\\b"));
+    static const QRegularExpression pidRe(QStringLiteral("\\bPID=\\d+\\b"));
 
     msg.replace(urlRe, QStringLiteral("[下载地址已隐藏]"));
+    msg.replace(hexAddressRe, QStringLiteral("0x[隐藏]"));
+    msg.replace(pidRe, QStringLiteral("PID=[隐藏]"));
 
     QRegularExpressionMatchIterator it = winPathRe.globalMatch(msg);
     QList<QRegularExpressionMatch> matches;
@@ -103,6 +107,35 @@ static QString sanitizeUiLogMessage(QString msg)
     }
 
     return msg;
+}
+
+static QString sanitizeModelLogMessage(QString msg)
+{
+    if (!msg.startsWith(QStringLiteral("[MODEL]"))) {
+        return sanitizeUiLogMessage(msg);
+    }
+
+    if (msg.contains(QStringLiteral("hook resolved")) ||
+        msg.contains(QStringLiteral("hook installed")) ||
+        msg.contains(QStringLiteral("hook hit")) ||
+        msg.contains(QStringLiteral("remote ")) ||
+        msg.contains(QStringLiteral("resolver group")) ||
+        msg.contains(QStringLiteral("addr=")) ||
+        msg.contains(QStringLiteral("shell=")) ||
+        msg.contains(QStringLiteral("actual="))) {
+        return QString();
+    }
+
+    if (msg.contains(QStringLiteral("base=")) || msg.contains(QStringLiteral("size="))) {
+        return QStringLiteral("[MODEL] 模块已就绪");
+    }
+    if (msg.contains(QStringLiteral("name-anchored resolver failed")) ||
+        msg.contains(QStringLiteral("resolver failed")) ||
+        msg.contains(QStringLiteral("resolver incomplete"))) {
+        return QStringLiteral("[MODEL] 定位替换点失败");
+    }
+
+    return sanitizeUiLogMessage(msg);
 }
 
 static bool fileMatchesArtifact(const QString &path, const Updater::ArtifactInfo &artifact)
@@ -655,7 +688,10 @@ void Backend::setAuthSessionVerified(bool verified)
 static void s_modelLogCallback(const char *msg)
 {
     if (s_backendInstance) {
-        QString m = QString::fromUtf8(msg);
+        QString m = sanitizeModelLogMessage(QString::fromUtf8(msg));
+        if (m.isEmpty()) {
+            return;
+        }
         QMetaObject::invokeMethod(s_backendInstance, [m]() {
             if (s_backendInstance) {
                 emit s_backendInstance->_logSignal(m);
@@ -782,7 +818,7 @@ void Backend::startModelReplacementWait()
     if (rc == 0) {
         m_modelReplacementRestartPending = false;
         setModelReplacementRunning(true);
-        setModelReplacementStatus(QStringLiteral("等待游戏进程启动"));
+        setModelReplacementStatus(QStringLiteral("正在运行"));
         m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(active.name));
     } else if (rc == 2) {
         setModelReplacementRunning(true);
@@ -1239,8 +1275,7 @@ void Backend::handleModelDllState(const QString &key, const QString &value)
     }
     if (key == QStringLiteral("model_state")) {
         setModelReplacementStatus(value);
-        if (value == QStringLiteral("等待游戏进程启动") &&
-            m_modelReplacementRestartPending && m_modelReplacementRunning &&
+        if (m_modelReplacementRestartPending && m_modelReplacementRunning &&
             m_modelFuncs && m_modelFuncs->fn_is_waiting_for_process &&
             m_modelFuncs->fn_is_waiting_for_process() == 1) {
             if (m_modelFuncs->fn_stop_wait) {
@@ -2484,13 +2519,13 @@ void Backend::selectProcess(int pid)
     m_selectedPid = static_cast<uint>(pid);
     m_procModel->setSelected(m_selectedPid);
     emit selectedPidChanged();
-    m_logModel->append(QString("[SEL] 已选中 PID=%1").arg(pid));
+    m_logModel->append(QStringLiteral("[SEL] 已选中游戏进程"));
 }
 
 void Backend::bringToFront(int pid)
 {
     Win32Process::bringToFront(static_cast<uint>(pid));
-    m_logModel->append(QString("[WIN] 已将 PID=%1 窗口调至前台").arg(pid));
+    m_logModel->append(QStringLiteral("[WIN] 已尝试唤起游戏窗口"));
 }
 
 void Backend::setScanTarget(const QString &name)
@@ -2537,8 +2572,12 @@ void Backend::autoScan()
 
     QSet<uint> added = newPids - m_prevPids;
     QSet<uint> removed = m_prevPids - newPids;
-    for (uint pid : added) m_logModel->append(QString("[SCN] New process PID=%1").arg(pid));
-    for (uint pid : removed) m_logModel->append(QString("[SCN] Process gone PID=%1").arg(pid));
+    if (!added.isEmpty()) {
+        m_logModel->append(QStringLiteral("[SCN] 发现游戏进程"));
+    }
+    if (!removed.isEmpty()) {
+        m_logModel->append(QStringLiteral("[SCN] 游戏进程已关闭"));
+    }
     m_prevPids = newPids;
 
     if (procs.isEmpty()) {
