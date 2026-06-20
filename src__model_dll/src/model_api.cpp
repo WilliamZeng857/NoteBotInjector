@@ -33,7 +33,7 @@
 namespace {
 
 constexpr int kProtocolVersion = 1;
-constexpr int kAbiVersion = 1;
+constexpr int kAbiVersion = 2;
 constexpr wchar_t kTargetProcess[] = L"Minecraft.Windows.exe";
 constexpr DWORD kStillActive = 259;
 constexpr int kOk = 0;
@@ -1521,6 +1521,11 @@ public:
         return m_running ? 1 : 0;
     }
 
+    int isWaitingForProcess() const
+    {
+        return m_waitingForProcess.load() ? 1 : 0;
+    }
+
     void shutdown()
     {
         m_stopRequested.store(true);
@@ -1534,12 +1539,14 @@ public:
         if (old.joinable()) {
             old.join();
         }
+        m_waitingForProcess.store(false);
     }
 
 private:
     void run(PayloadConfig cfg)
     {
         emitState("model_running", QStringLiteral("true"));
+        m_waitingForProcess.store(true);
         emitState("model_state", QStringLiteral("等待游戏进程启动"));
         emitLog(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动"));
 
@@ -1560,17 +1567,20 @@ private:
                 if (!probeProcessReady(pid, cfg)) {
                     continue;
                 }
+                m_waitingForProcess.store(false);
                 emitLog(QStringLiteral("[MODEL] 找到可替换的新进程 PID=%1").arg(pid));
                 const bool ok = patchProcess(pid, cfg);
                 emitState("model_state", ok ? QStringLiteral("本次替换完成") : QStringLiteral("失败"));
                 if (m_stopRequested.load()) {
                     break;
                 }
+                m_waitingForProcess.store(true);
                 emitState("model_state", QStringLiteral("等待游戏进程启动"));
                 baseline = enumTargetPids();
             }
             QThread::msleep(50);
         }
+        m_waitingForProcess.store(false);
         if (m_stopRequested.load()) {
             emitState("model_state", QStringLiteral("已停止"));
             emitLog(QStringLiteral("[MODEL] 已停止等待"));
@@ -1586,6 +1596,7 @@ private:
     mutable QMutex m_mutex;
     std::thread m_worker;
     std::atomic_bool m_stopRequested{false};
+    std::atomic_bool m_waitingForProcess{false};
     bool m_running = false;
 };
 
@@ -1645,6 +1656,11 @@ NBMAPI int nbm_stop_wait(void)
 NBMAPI int nbm_is_running(void)
 {
     return g_runtime.isRunning();
+}
+
+NBMAPI int nbm_is_waiting_for_process(void)
+{
+    return g_runtime.isWaitingForProcess();
 }
 
 }

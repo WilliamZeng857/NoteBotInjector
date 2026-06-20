@@ -45,6 +45,8 @@ static QString computeFileHash(const QString &filePath, QCryptographicHash::Algo
 
 constexpr int kExpectedAuthProtocolVersion = 3;
 constexpr int kExpectedAuthAbiVersion = 1;
+constexpr int kExpectedModelProtocolVersion = 1;
+constexpr int kExpectedModelAbiVersion = 2;
 
 static QString normalizeLicenseKeyForIdentity(const QString &key)
 {
@@ -401,6 +403,7 @@ struct ModelDllFuncs {
     decltype(nbm_start_wait)*           fn_start_wait = nullptr;
     decltype(nbm_stop_wait)*            fn_stop_wait = nullptr;
     decltype(nbm_is_running)*           fn_is_running = nullptr;
+    decltype(nbm_is_waiting_for_process)* fn_is_waiting_for_process = nullptr;
 
     bool resolve(HMODULE h)
     {
@@ -419,6 +422,7 @@ struct ModelDllFuncs {
         RESOLVE_MODEL(start_wait)
         RESOLVE_MODEL(stop_wait)
         RESOLVE_MODEL(is_running)
+        RESOLVE_MODEL(is_waiting_for_process)
 #undef RESOLVE_MODEL
         return true;
     }
@@ -691,10 +695,8 @@ void Backend::activateModel(const QString &modelId)
     m_activeModelId = trimmed;
     m_modelCatalogModel->setActiveModelId(trimmed);
     m_logModel->append(QStringLiteral("[MODEL] 当前激活模型：%1").arg(trimmed));
-    if (m_modelModificationEnabled && m_authSessionVerified && !m_modelReplacementRunning) {
-        QTimer::singleShot(0, this, [this]() {
-            startModelReplacementWait();
-        });
+    if (m_modelModificationEnabled && m_authSessionVerified) {
+        requestModelReplacementRestart();
     }
 }
 
@@ -778,6 +780,7 @@ void Backend::startModelReplacementWait()
     const QByteArray json = QJsonDocument(cfg).toJson(QJsonDocument::Compact);
     const int rc = m_modelFuncs->fn_start_wait(json.constData());
     if (rc == 0) {
+        m_modelReplacementRestartPending = false;
         setModelReplacementRunning(true);
         setModelReplacementStatus(QStringLiteral("等待游戏进程启动"));
         m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(active.name));
@@ -793,6 +796,7 @@ void Backend::startModelReplacementWait()
 
 void Backend::stopModelReplacementWait()
 {
+    m_modelReplacementRestartPending = false;
     if (m_modelFuncs && m_modelFuncs->fn_stop_wait) {
         m_modelFuncs->fn_stop_wait();
     }
@@ -1136,8 +1140,8 @@ bool Backend::loadModelDll()
         setModelReplacementStatus(QStringLiteral("失败"));
         return false;
     }
-    if (m_modelFuncs->fn_get_protocol_version() != 1 ||
-        m_modelFuncs->fn_get_abi_version() != 1) {
+    if (m_modelFuncs->fn_get_protocol_version() != kExpectedModelProtocolVersion ||
+        m_modelFuncs->fn_get_abi_version() != kExpectedModelAbiVersion) {
         m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 协议版本不兼容"));
         delete m_modelFuncs;
         m_modelFuncs = nullptr;
@@ -1177,6 +1181,30 @@ void Backend::unloadModelDll()
     setModelReplacementRunning(false);
 }
 
+void Backend::requestModelReplacementRestart()
+{
+    if (!m_modelModificationEnabled || !m_authSessionVerified) {
+        return;
+    }
+    if (!m_modelReplacementRunning) {
+        QTimer::singleShot(0, this, [this]() {
+            startModelReplacementWait();
+        });
+        return;
+    }
+
+    m_modelReplacementRestartPending = true;
+    if (m_modelFuncs && m_modelFuncs->fn_is_waiting_for_process &&
+        m_modelFuncs->fn_is_waiting_for_process() == 1) {
+        if (m_modelFuncs->fn_stop_wait) {
+            m_modelFuncs->fn_stop_wait();
+        }
+        m_logModel->append(QStringLiteral("[MODEL] 模型已切换，正在重新等待新游戏进程"));
+    } else {
+        m_logModel->append(QStringLiteral("[MODEL] 模型已切换，本轮替换完成后生效"));
+    }
+}
+
 void Backend::setModelReplacementRunning(bool running)
 {
     if (m_modelReplacementRunning == running) {
@@ -1199,7 +1227,13 @@ void Backend::handleModelDllState(const QString &key, const QString &value)
 {
     if (key == QStringLiteral("model_running")) {
         setModelReplacementRunning(value == QStringLiteral("true"));
-        if (value != QStringLiteral("true") && m_modelModificationEnabled &&
+        if (value != QStringLiteral("true") && m_modelReplacementRestartPending &&
+            m_modelModificationEnabled && m_authSessionVerified) {
+            m_modelReplacementRestartPending = false;
+            QTimer::singleShot(0, this, [this]() {
+                startModelReplacementWait();
+            });
+        } else if (value != QStringLiteral("true") && m_modelModificationEnabled &&
             m_modelReplacementStatus == QStringLiteral("已停止")) {
             setModelReplacementStatus(QStringLiteral("等待密钥验证"));
         }
@@ -1207,6 +1241,15 @@ void Backend::handleModelDllState(const QString &key, const QString &value)
     }
     if (key == QStringLiteral("model_state")) {
         setModelReplacementStatus(value);
+        if (value == QStringLiteral("等待游戏进程启动") &&
+            m_modelReplacementRestartPending && m_modelReplacementRunning &&
+            m_modelFuncs && m_modelFuncs->fn_is_waiting_for_process &&
+            m_modelFuncs->fn_is_waiting_for_process() == 1) {
+            if (m_modelFuncs->fn_stop_wait) {
+                m_modelFuncs->fn_stop_wait();
+            }
+            m_logModel->append(QStringLiteral("[MODEL] 本轮完成，正在切换到新模型等待下一次启动"));
+        }
         return;
     }
 }

@@ -140,6 +140,7 @@ private:
     void unloadModelDll();
     void setModelReplacementRunning(bool running);
     void setModelReplacementStatus(const QString &status);
+    void requestModelReplacementRestart();
     void syncStatusFromDll();
     void syncHostUpdateSnapshot(const QString &state, bool authDllPendingReplace = false);
     void checkDllUpdateAsyncInternal();
@@ -184,6 +185,7 @@ private:
     bool m_injectRunning = false;
     bool m_modelModificationEnabled = false;
     bool m_modelReplacementRunning = false;
+    bool m_modelReplacementRestartPending = false;
     QString m_modelReplacementStatus = "已关闭";
     bool m_isActivated = false;
     bool m_authSessionVerified = false;

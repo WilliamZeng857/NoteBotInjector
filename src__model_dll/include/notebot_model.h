@@ -23,6 +23,7 @@ NBMAPI void nbm_set_state_callback(NBM_StateCallback cb);
 NBMAPI int nbm_start_wait(const char *json_config);
 NBMAPI int nbm_stop_wait(void);
 NBMAPI int nbm_is_running(void);
+NBMAPI int nbm_is_waiting_for_process(void);
 
 #ifdef __cplusplus
 }
