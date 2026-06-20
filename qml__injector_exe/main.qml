@@ -834,38 +834,14 @@ Window {
                                   : Qt.rgba(1, 1, 1, 0.07)
                     border.width: 1
 
+                    TapHandler {
+                        onTapped: backend.modelModificationEnabled = !backend.modelModificationEnabled
+                    }
+
                     RowLayout {
                         anchors.fill: parent
                         anchors.margins: 8
                         spacing: 8
-
-                        Rectangle {
-                            Layout.preferredWidth: 34
-                            Layout.preferredHeight: 20
-                            radius: 10
-                            color: backend.modelModificationEnabled
-                                   ? Qt.rgba(0.133, 0.827, 0.933, 0.20)
-                                   : Qt.rgba(1, 1, 1, 0.06)
-                            border.color: backend.modelModificationEnabled
-                                          ? Qt.rgba(0.133, 0.827, 0.933, 0.55)
-                                          : Qt.rgba(1, 1, 1, 0.10)
-                            border.width: 1
-
-                            Rectangle {
-                                width: 14
-                                height: 14
-                                radius: 7
-                                anchors.verticalCenter: parent.verticalCenter
-                                x: backend.modelModificationEnabled ? parent.width - width - 3 : 3
-                                color: backend.modelModificationEnabled ? accentCyan : textMuted
-                                Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
-                                Behavior on color { ColorAnimation { duration: 120 } }
-                            }
-
-                            TapHandler {
-                                onTapped: backend.modelModificationEnabled = !backend.modelModificationEnabled
-                            }
-                        }
 
                         ColumnLayout {
                             Layout.fillWidth: true
