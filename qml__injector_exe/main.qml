@@ -849,7 +849,7 @@ Window {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: "启动阶段模型替换"
+                                text: "模型替换"
                                 color: textPrimary
                                 font.pixelSize: 11
                                 font.bold: true
@@ -860,8 +860,8 @@ Window {
                             Text {
                                 Layout.fillWidth: true
                                 text: backend.modelModificationEnabled
-                                      ? "开启后自动等待新进程"
-                                      : "关闭时不改启动阶段"
+                                      ? "开：等待新进程"
+                                      : "关：不改启动"
                                 color: textSecondary
                                 font.pixelSize: 10
                                 font.family: "Microsoft YaHei UI"
@@ -871,7 +871,7 @@ Window {
 
                         Rectangle {
                             id: modelReplacementStateBadge
-                            Layout.preferredWidth: 96
+                            Layout.preferredWidth: 72
                             Layout.preferredHeight: 26
                             radius: 7
                             color: backend.modelReplacementStatus === "失败"

@@ -1,5 +1,7 @@
 # NoteBotInjector
 
+> 本仓库由 Codex/GPT 负责全部维护与日常修改。
+
 NoteBotInjector 是 NoteBot 的 Windows Qt/QML 启动器项目，负责本地启动界面、更新器、V3 授权状态、模型预览，以及主 DLL 注入流程的桌面端集成。
 
 当前仓库保存的是启动器、授权 DLL、更新器和相关构建脚本的源码快照。构建产物、缓存目录、验证截图和临时工作区不会进入 Git。
