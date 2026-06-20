@@ -52,12 +52,14 @@ python C:\NB\tools__project_helpers\build\filter_map.py
 python C:\NB\tools__project_helpers\build\filter_map_dll.py
 copy /y build__injector_exe_cache\NoteBotInjector.exe dist__release_artifacts\NoteBotInjector.exe >nul
 if exist build__injector_exe_cache\NoteBotUpdater.exe copy /y build__injector_exe_cache\NoteBotUpdater.exe dist__release_artifacts\NoteBotUpdater.exe >nul
+if exist build__injector_exe_cache\NoteBotModel.dll copy /y build__injector_exe_cache\NoteBotModel.dll dist__release_artifacts\NoteBotModel.dll >nul
 
 echo.
 echo ============================================================
 echo [DONE] Full incremental build complete.
 echo DIST EXE : dist__release_artifacts\NoteBotInjector.exe
 echo DIST UPD : dist__release_artifacts\NoteBotUpdater.exe
+echo DIST MDL : dist__release_artifacts\NoteBotModel.dll
 echo BUILD EXE: build__injector_exe_cache\NoteBotInjector.exe
 echo BUILD DLL: build__auth_dll_cache\NoteBotAuth.dll
 echo ============================================================

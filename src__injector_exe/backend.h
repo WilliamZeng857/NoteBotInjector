@@ -12,6 +12,7 @@
 
 /* 前向声明 DLL 加载器 */
 struct AuthDllFuncs;
+struct ModelDllFuncs;
 class ModelCatalogModel;
 
 class Backend : public QObject
@@ -31,6 +32,9 @@ class Backend : public QObject
     Q_PROPERTY(int downloadProgress READ downloadProgress NOTIFY downloadProgressChanged)
     Q_PROPERTY(int injectProgress READ injectProgress NOTIFY injectProgressChanged)
     Q_PROPERTY(QString injectStageText READ injectStageText NOTIFY injectStageTextChanged)
+    Q_PROPERTY(bool modelModificationEnabled READ modelModificationEnabled WRITE setModelModificationEnabled NOTIFY modelModificationEnabledChanged)
+    Q_PROPERTY(bool modelReplacementRunning READ modelReplacementRunning NOTIFY modelReplacementRunningChanged)
+    Q_PROPERTY(QString modelReplacementStatus READ modelReplacementStatus NOTIFY modelReplacementStatusChanged)
     Q_PROPERTY(bool initializing READ initializing NOTIFY initializingChanged)
     Q_PROPERTY(int initStep READ initStep NOTIFY initStepChanged)
     Q_PROPERTY(QString initStatus READ initStatus NOTIFY initStatusChanged)
@@ -56,6 +60,10 @@ public:
     int downloadProgress() const { return m_downloadProgress; }
     int injectProgress() const { return m_injectProgress; }
     QString injectStageText() const { return m_injectStageText; }
+    bool modelModificationEnabled() const { return m_modelModificationEnabled; }
+    bool modelReplacementRunning() const { return m_modelReplacementRunning; }
+    QString modelReplacementStatus() const { return m_modelReplacementStatus; }
+    void setModelModificationEnabled(bool enabled);
     bool initializing() const { return m_initializing; }
     int initStep() const { return m_initStep; }
     QString initStatus() const { return m_initStatus; }
@@ -64,6 +72,8 @@ public:
     Q_INVOKABLE void callDllAsync(const QString &action, const QString &json = QString());
     Q_INVOKABLE void appendLog(const QString &msg);
     Q_INVOKABLE void activateModel(const QString &modelId);
+    Q_INVOKABLE void startModelReplacementWait();
+    Q_INVOKABLE void stopModelReplacementWait();
 
     // 同步加载 DLL（只 LoadLibrary + 解析导出，不做验证）
     bool loadAuthDll();
@@ -89,6 +99,9 @@ signals:
     void downloadProgressChanged();
     void injectProgressChanged();
     void injectStageTextChanged();
+    void modelModificationEnabledChanged();
+    void modelReplacementRunningChanged();
+    void modelReplacementStatusChanged();
     void splashFinished();
     void initializingChanged();
     void initStepChanged();
@@ -115,6 +128,7 @@ public slots:
 
 public slots:
     void onDllStateChanged(const QString &key, const QString &value);
+    void handleModelDllState(const QString &key, const QString &value);
 
 private slots:
     void onLogMsg(const QString &msg);
@@ -122,6 +136,10 @@ private slots:
 
 private:
     void unloadAuthDll();
+    bool loadModelDll();
+    void unloadModelDll();
+    void setModelReplacementRunning(bool running);
+    void setModelReplacementStatus(const QString &status);
     void syncStatusFromDll();
     void syncHostUpdateSnapshot(const QString &state, bool authDllPendingReplace = false);
     void checkDllUpdateAsyncInternal();
@@ -164,6 +182,9 @@ private:
     int m_injectProgress = -1;
     QString m_injectStageText;
     bool m_injectRunning = false;
+    bool m_modelModificationEnabled = false;
+    bool m_modelReplacementRunning = false;
+    QString m_modelReplacementStatus = "已关闭";
     bool m_isActivated = false;
     bool m_authSessionVerified = false;
     QString m_licenseKey;
@@ -179,6 +200,8 @@ private:
     // DLL 句柄和函数表
     AuthDllFuncs *m_funcs = nullptr;
     void *m_hDll = nullptr;
+    ModelDllFuncs *m_modelFuncs = nullptr;
+    void *m_hModelDll = nullptr;
 };
 
 #endif // BACKEND_H

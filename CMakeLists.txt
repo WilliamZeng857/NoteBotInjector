@@ -34,11 +34,24 @@ set(HEADERS
     src__injector_exe/backend.h
 )
 
+set(MODEL_DLL_SOURCES
+    src__model_dll/src/model_api.cpp
+)
+
+set(MODEL_DLL_HEADERS
+    src__model_dll/include/notebot_model.h
+)
+
 qt_add_executable(NoteBotInjector WIN32
     ${SOURCES}
     ${HEADERS}
     resources__injector_exe/app.qrc
     resources__injector_exe/app_icon.rc
+)
+
+add_library(NoteBotModel SHARED
+    ${MODEL_DLL_SOURCES}
+    ${MODEL_DLL_HEADERS}
 )
 
 add_executable(NoteBotUpdater WIN32
@@ -57,9 +70,14 @@ target_include_directories(NoteBotUpdater PRIVATE
     src__updater_exe
 )
 
+target_include_directories(NoteBotModel PRIVATE
+    src__model_dll/include
+)
+
 if(MSVC)
     target_compile_options(NoteBotInjector PRIVATE /utf-8)
     target_compile_options(NoteBotUpdater PRIVATE /utf-8)
+    target_compile_options(NoteBotModel PRIVATE /utf-8)
 endif()
 
 set_target_properties(NoteBotInjector PROPERTIES
@@ -70,6 +88,10 @@ set_target_properties(NoteBotInjector PROPERTIES
 set_target_properties(NoteBotUpdater PROPERTIES
     WIN32_EXECUTABLE TRUE
     OUTPUT_NAME "NoteBotUpdater"
+)
+
+set_target_properties(NoteBotModel PROPERTIES
+    OUTPUT_NAME "NoteBotModel"
 )
 
 set(NB_EMBEDDED_UPDATER_PATH
@@ -107,6 +129,11 @@ target_link_libraries(NoteBotUpdater PRIVATE
     Qt6::Core
 )
 
+target_link_libraries(NoteBotModel PRIVATE
+    Qt6::Core
+    Qt6::Gui
+)
+
 if(WIN32)
     target_link_libraries(NoteBotInjector PRIVATE
         user32 kernel32 gdi32 shell32 advapi32 ole32
@@ -116,6 +143,9 @@ if(WIN32)
     )
     target_link_libraries(NoteBotUpdater PRIVATE
         user32 kernel32 shell32 advapi32 ole32
+    )
+    target_link_libraries(NoteBotModel PRIVATE
+        user32 kernel32 psapi
     )
 endif()
 

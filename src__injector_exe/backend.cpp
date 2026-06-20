@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <windows.h>
 #include "../src__auth_dll/include/notebot_auth.h"
+#include "../src__model_dll/include/notebot_model.h"
 
 static QString computeFileHash(const QString &filePath, QCryptographicHash::Algorithm algorithm)
 {
@@ -388,6 +389,41 @@ struct AuthDllFuncs {
     }
 };
 
+struct ModelDllFuncs {
+    HMODULE hDll = nullptr;
+
+    decltype(nbm_get_protocol_version)* fn_get_protocol_version = nullptr;
+    decltype(nbm_get_abi_version)*      fn_get_abi_version = nullptr;
+    decltype(nbm_init)*                 fn_init = nullptr;
+    decltype(nbm_shutdown)*             fn_shutdown = nullptr;
+    decltype(nbm_set_log_callback)*     fn_set_log_callback = nullptr;
+    decltype(nbm_set_state_callback)*   fn_set_state_callback = nullptr;
+    decltype(nbm_start_wait)*           fn_start_wait = nullptr;
+    decltype(nbm_stop_wait)*            fn_stop_wait = nullptr;
+    decltype(nbm_is_running)*           fn_is_running = nullptr;
+
+    bool resolve(HMODULE h)
+    {
+        hDll = h;
+        auto getAndCheck = [&](const char *name, void **out) -> bool {
+            *out = GetProcAddress(h, name);
+            return *out != nullptr;
+        };
+#define RESOLVE_MODEL(name) if (!getAndCheck("nbm_" #name, (void**)&fn_##name)) return false;
+        RESOLVE_MODEL(get_protocol_version)
+        RESOLVE_MODEL(get_abi_version)
+        RESOLVE_MODEL(init)
+        RESOLVE_MODEL(shutdown)
+        RESOLVE_MODEL(set_log_callback)
+        RESOLVE_MODEL(set_state_callback)
+        RESOLVE_MODEL(start_wait)
+        RESOLVE_MODEL(stop_wait)
+        RESOLVE_MODEL(is_running)
+#undef RESOLVE_MODEL
+        return true;
+    }
+};
+
 static QString g_dllLogBuffer;
 static Backend *s_backendInstance = nullptr;
 
@@ -481,6 +517,10 @@ Backend::Backend(ProcessModel *procModel,
     // 从 QSettings 读取上次保存的密钥
     QSettings settings("NoteBot", "Injector");
     m_licenseKey = settings.value("licenseKey").toString();
+    m_modelModificationEnabled = settings.value(QStringLiteral("modelModificationEnabled"), false).toBool();
+    m_modelReplacementStatus = m_modelModificationEnabled
+        ? QStringLiteral("未等待")
+        : QStringLiteral("已关闭");
     m_initStatus = "准备启动...";
     m_initStep = 3;
     qInfo() << "Backend constructor: done";
@@ -604,6 +644,31 @@ void Backend::setAuthSessionVerified(bool verified)
     }
 }
 
+static void s_modelLogCallback(const char *msg)
+{
+    if (s_backendInstance) {
+        QString m = QString::fromUtf8(msg);
+        QMetaObject::invokeMethod(s_backendInstance, [m]() {
+            if (s_backendInstance) {
+                emit s_backendInstance->_logSignal(m);
+            }
+        }, Qt::QueuedConnection);
+    }
+}
+
+static void s_modelStateCallback(const char *key, const char *value)
+{
+    if (s_backendInstance) {
+        QString k = QString::fromUtf8(key);
+        QString v = QString::fromUtf8(value);
+        QMetaObject::invokeMethod(s_backendInstance, [k, v]() {
+            if (s_backendInstance) {
+                s_backendInstance->handleModelDllState(k, v);
+            }
+        }, Qt::QueuedConnection);
+    }
+}
+
 void Backend::clearModelCatalog()
 {
     if (m_modelCatalogModel) {
@@ -622,6 +687,109 @@ void Backend::activateModel(const QString &modelId)
     m_activeModelId = trimmed;
     m_modelCatalogModel->setActiveModelId(trimmed);
     m_logModel->append(QStringLiteral("[MODEL] 当前激活模型：%1").arg(trimmed));
+}
+
+void Backend::setModelModificationEnabled(bool enabled)
+{
+    if (m_modelModificationEnabled == enabled) {
+        return;
+    }
+    m_modelModificationEnabled = enabled;
+    QSettings settings(QStringLiteral("NoteBot"), QStringLiteral("Injector"));
+    settings.setValue(QStringLiteral("modelModificationEnabled"), enabled);
+    emit modelModificationEnabledChanged();
+
+    if (!enabled) {
+        stopModelReplacementWait();
+        setModelReplacementStatus(QStringLiteral("已关闭"));
+        m_logModel->append(QStringLiteral("[MODEL] 启动阶段模型替换已关闭"));
+    } else {
+        if (!m_modelReplacementRunning) {
+            setModelReplacementStatus(QStringLiteral("未等待"));
+        }
+        m_logModel->append(QStringLiteral("[MODEL] 启动阶段模型替换已启用，需手动等待下次启动"));
+    }
+}
+
+void Backend::startModelReplacementWait()
+{
+    if (!m_modelModificationEnabled) {
+        m_logModel->append(QStringLiteral("[MODEL] 启动阶段模型替换已关闭"));
+        setModelReplacementStatus(QStringLiteral("已关闭"));
+        return;
+    }
+    if (!m_authSessionVerified) {
+        m_logModel->append(QStringLiteral("[MODEL] 本次会话尚未完成密钥检查，不能开始等待"));
+        setModelReplacementStatus(QStringLiteral("失败"));
+        return;
+    }
+    if (m_modelReplacementRunning) {
+        m_logModel->append(QStringLiteral("[MODEL] 当前已经在等待下次启动"));
+        return;
+    }
+    if (!m_modelCatalogModel) {
+        m_logModel->append(QStringLiteral("[MODEL] 模型列表不可用"));
+        setModelReplacementStatus(QStringLiteral("失败"));
+        return;
+    }
+    ModelCatalogEntry active;
+    if (!m_modelCatalogModel->activeEntry(&active)) {
+        m_logModel->append(QStringLiteral("[MODEL] 请先选择一个已拥有的模型"));
+        setModelReplacementStatus(QStringLiteral("未等待"));
+        return;
+    }
+    if (active.modelFile.isEmpty() || active.textureFile.isEmpty() ||
+        !QFile::exists(active.modelFile) || !QFile::exists(active.textureFile)) {
+        m_logModel->append(QStringLiteral("[MODEL] 当前模型资源缺失，请重新检查密钥或刷新模型列表"));
+        setModelReplacementStatus(QStringLiteral("失败"));
+        return;
+    }
+    if (!loadModelDll()) {
+        return;
+    }
+
+    QJsonObject cfg;
+    cfg[QStringLiteral("geometry_path")] = active.modelFile;
+    cfg[QStringLiteral("texture_path")] = active.textureFile;
+    cfg[QStringLiteral("skin_id")] =
+        QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
+    cfg[QStringLiteral("arm_size")] = QStringLiteral("slim");
+    cfg[QStringLiteral("trusted")] = true;
+    cfg[QStringLiteral("premium")] = true;
+    cfg[QStringLiteral("persona")] = true;
+    cfg[QStringLiteral("process_timeout_ms")] = 86400 * 1000;
+    cfg[QStringLiteral("hook_timeout_ms")] = 90000;
+    cfg[QStringLiteral("hit_timeout_ms")] = 45000;
+
+    const QByteArray json = QJsonDocument(cfg).toJson(QJsonDocument::Compact);
+    const int rc = m_modelFuncs->fn_start_wait(json.constData());
+    if (rc == 0) {
+        setModelReplacementRunning(true);
+        setModelReplacementStatus(QStringLiteral("等待 Minecraft 启动"));
+        m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(active.name));
+    } else if (rc == 2) {
+        setModelReplacementRunning(true);
+        m_logModel->append(QStringLiteral("[MODEL] 当前已经在等待下次启动"));
+    } else {
+        setModelReplacementRunning(false);
+        setModelReplacementStatus(QStringLiteral("失败"));
+        m_logModel->append(QStringLiteral("[MODEL] 等待启动失败，错误码=%1").arg(rc));
+    }
+}
+
+void Backend::stopModelReplacementWait()
+{
+    if (m_modelFuncs && m_modelFuncs->fn_stop_wait) {
+        m_modelFuncs->fn_stop_wait();
+    }
+    if (m_modelReplacementRunning) {
+        setModelReplacementStatus(QStringLiteral("停止中"));
+        m_logModel->append(QStringLiteral("[MODEL] 已请求停止等待"));
+    } else if (m_modelModificationEnabled) {
+        setModelReplacementStatus(QStringLiteral("未等待"));
+    } else {
+        setModelReplacementStatus(QStringLiteral("已关闭"));
+    }
 }
 
 void Backend::refreshModelEntitlementsAsync()
@@ -790,6 +958,7 @@ Backend::~Backend()
     if (s_backendInstance == this) {
         s_backendInstance = nullptr;
     }
+    unloadModelDll();
     unloadAuthDll();
 }
 
@@ -915,6 +1084,112 @@ void Backend::unloadAuthDll()
     delete m_funcs;
     m_funcs = nullptr;
     FreeLibrary(h);
+}
+
+bool Backend::loadModelDll()
+{
+    if (m_modelFuncs) {
+        return true;
+    }
+
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString dllPath = QDir(appDir).absoluteFilePath(QStringLiteral("NoteBotModel.dll"));
+    if (!QFile::exists(dllPath)) {
+        m_logModel->append(QStringLiteral("[MODEL] 未找到 NoteBotModel.dll"));
+        setModelReplacementStatus(QStringLiteral("失败"));
+        return false;
+    }
+
+    HMODULE h = LoadLibraryW(reinterpret_cast<const wchar_t*>(dllPath.utf16()));
+    if (!h) {
+        const DWORD err = GetLastError();
+        m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 加载失败：%1").arg(err));
+        setModelReplacementStatus(QStringLiteral("失败"));
+        return false;
+    }
+
+    m_modelFuncs = new ModelDllFuncs();
+    if (!m_modelFuncs->resolve(h)) {
+        m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 导出函数解析失败"));
+        delete m_modelFuncs;
+        m_modelFuncs = nullptr;
+        FreeLibrary(h);
+        setModelReplacementStatus(QStringLiteral("失败"));
+        return false;
+    }
+    if (m_modelFuncs->fn_get_protocol_version() != 1 ||
+        m_modelFuncs->fn_get_abi_version() != 1) {
+        m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 协议版本不兼容"));
+        delete m_modelFuncs;
+        m_modelFuncs = nullptr;
+        FreeLibrary(h);
+        setModelReplacementStatus(QStringLiteral("失败"));
+        return false;
+    }
+    m_modelFuncs->fn_set_log_callback(s_modelLogCallback);
+    m_modelFuncs->fn_set_state_callback(s_modelStateCallback);
+    if (m_modelFuncs->fn_init() != 0) {
+        m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 初始化失败"));
+        delete m_modelFuncs;
+        m_modelFuncs = nullptr;
+        FreeLibrary(h);
+        setModelReplacementStatus(QStringLiteral("失败"));
+        return false;
+    }
+    m_logModel->append(QStringLiteral("[MODEL] 模型替换模块加载成功"));
+    return true;
+}
+
+void Backend::unloadModelDll()
+{
+    if (!m_modelFuncs) {
+        return;
+    }
+    if (m_modelFuncs->fn_stop_wait) {
+        m_modelFuncs->fn_stop_wait();
+    }
+    if (m_modelFuncs->fn_shutdown) {
+        m_modelFuncs->fn_shutdown();
+    }
+    HMODULE h = m_modelFuncs->hDll;
+    delete m_modelFuncs;
+    m_modelFuncs = nullptr;
+    FreeLibrary(h);
+    setModelReplacementRunning(false);
+}
+
+void Backend::setModelReplacementRunning(bool running)
+{
+    if (m_modelReplacementRunning == running) {
+        return;
+    }
+    m_modelReplacementRunning = running;
+    emit modelReplacementRunningChanged();
+}
+
+void Backend::setModelReplacementStatus(const QString &status)
+{
+    if (m_modelReplacementStatus == status) {
+        return;
+    }
+    m_modelReplacementStatus = status;
+    emit modelReplacementStatusChanged();
+}
+
+void Backend::handleModelDllState(const QString &key, const QString &value)
+{
+    if (key == QStringLiteral("model_running")) {
+        setModelReplacementRunning(value == QStringLiteral("true"));
+        if (value != QStringLiteral("true") && m_modelModificationEnabled &&
+            m_modelReplacementStatus == QStringLiteral("已停止")) {
+            setModelReplacementStatus(QStringLiteral("未等待"));
+        }
+        return;
+    }
+    if (key == QStringLiteral("model_state")) {
+        setModelReplacementStatus(value);
+        return;
+    }
 }
 
 void Backend::syncStatusFromDll()

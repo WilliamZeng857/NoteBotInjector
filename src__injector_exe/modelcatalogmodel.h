@@ -51,6 +51,7 @@ public:
 
     void setEntries(const QVector<ModelCatalogEntry> &entries);
     void setActiveModelId(const QString &modelId);
+    bool activeEntry(ModelCatalogEntry *out) const;
     void clear();
 
 signals:

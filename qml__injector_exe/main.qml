@@ -824,6 +824,120 @@ Window {
                 Item { Layout.fillHeight: true }
 
                 Rectangle {
+                    id: modelReplacementStrip
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 42
+                    radius: 8
+                    color: Qt.rgba(1, 1, 1, 0.025)
+                    border.color: backend.modelModificationEnabled
+                                  ? Qt.rgba(0.133, 0.827, 0.933, 0.28)
+                                  : Qt.rgba(1, 1, 1, 0.07)
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 8
+
+                        Rectangle {
+                            Layout.preferredWidth: 34
+                            Layout.preferredHeight: 20
+                            radius: 10
+                            color: backend.modelModificationEnabled
+                                   ? Qt.rgba(0.133, 0.827, 0.933, 0.20)
+                                   : Qt.rgba(1, 1, 1, 0.06)
+                            border.color: backend.modelModificationEnabled
+                                          ? Qt.rgba(0.133, 0.827, 0.933, 0.55)
+                                          : Qt.rgba(1, 1, 1, 0.10)
+                            border.width: 1
+
+                            Rectangle {
+                                width: 14
+                                height: 14
+                                radius: 7
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: backend.modelModificationEnabled ? parent.width - width - 3 : 3
+                                color: backend.modelModificationEnabled ? accentCyan : textMuted
+                                Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                            }
+
+                            TapHandler {
+                                onTapped: backend.modelModificationEnabled = !backend.modelModificationEnabled
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "启动阶段模型替换"
+                                color: textPrimary
+                                font.pixelSize: 11
+                                font.bold: true
+                                font.family: "Microsoft YaHei UI"
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: backend.modelReplacementStatus
+                                color: backend.modelReplacementStatus === "失败"
+                                       ? bad
+                                       : backend.modelReplacementRunning
+                                         ? accentCyan
+                                         : textSecondary
+                                font.pixelSize: 10
+                                font.family: "Microsoft YaHei UI"
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Rectangle {
+                            id: modelReplacementAction
+                            Layout.preferredWidth: 92
+                            Layout.preferredHeight: 26
+                            radius: 7
+                            enabled: backend.modelModificationEnabled
+                            opacity: enabled ? 1 : 0.45
+                            color: modelActionHover.hovered && enabled
+                                   ? Qt.rgba(0.545, 0.361, 0.965, 0.24)
+                                   : Qt.rgba(0.545, 0.361, 0.965, 0.14)
+                            border.color: modelActionHover.hovered && enabled
+                                          ? Qt.rgba(0.545, 0.361, 0.965, 0.50)
+                                          : Qt.rgba(0.545, 0.361, 0.965, 0.28)
+                            border.width: 1
+
+                            Text {
+                                anchors.fill: parent
+                                text: backend.modelReplacementRunning ? "停止等待" : "等待下次启动"
+                                color: "#F6F0FF"
+                                font.pixelSize: 10
+                                font.bold: true
+                                font.family: "Microsoft YaHei UI"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                            }
+
+                            HoverHandler { id: modelActionHover; enabled: modelReplacementAction.enabled }
+                            TapHandler {
+                                enabled: modelReplacementAction.enabled
+                                onTapped: {
+                                    if (backend.modelReplacementRunning) {
+                                        backend.stopModelReplacementWait()
+                                    } else {
+                                        backend.startModelReplacementWait()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
                     id: injectBtnRestored
                     Layout.fillWidth: true
                     height: 48

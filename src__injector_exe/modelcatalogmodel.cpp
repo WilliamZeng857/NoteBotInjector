@@ -113,6 +113,19 @@ void ModelCatalogModel::setActiveModelId(const QString &modelId)
                      {StateCodeRole, StateLabelRole, ActiveRole});
 }
 
+bool ModelCatalogModel::activeEntry(ModelCatalogEntry *out) const
+{
+    for (const ModelCatalogEntry &entry : m_entries) {
+        if (entry.active && entry.owned) {
+            if (out) {
+                *out = entry;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 void ModelCatalogModel::clear()
 {
     if (m_entries.isEmpty()) {
