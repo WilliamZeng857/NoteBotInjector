@@ -1540,7 +1540,7 @@ private:
     void run(PayloadConfig cfg)
     {
         emitState("model_running", QStringLiteral("true"));
-        emitState("model_state", QStringLiteral("等待 Minecraft 启动"));
+        emitState("model_state", QStringLiteral("等待游戏进程启动"));
         emitLog(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动"));
 
         std::vector<DWORD> baseline = enumTargetPids();
@@ -1566,7 +1566,7 @@ private:
                 if (m_stopRequested.load()) {
                     break;
                 }
-                emitState("model_state", QStringLiteral("等待 Minecraft 启动"));
+                emitState("model_state", QStringLiteral("等待游戏进程启动"));
                 baseline = enumTargetPids();
             }
             QThread::msleep(50);

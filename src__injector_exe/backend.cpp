@@ -779,7 +779,7 @@ void Backend::startModelReplacementWait()
     const int rc = m_modelFuncs->fn_start_wait(json.constData());
     if (rc == 0) {
         setModelReplacementRunning(true);
-        setModelReplacementStatus(QStringLiteral("等待 Minecraft 启动"));
+        setModelReplacementStatus(QStringLiteral("等待游戏进程启动"));
         m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(active.name));
     } else if (rc == 2) {
         setModelReplacementRunning(true);
