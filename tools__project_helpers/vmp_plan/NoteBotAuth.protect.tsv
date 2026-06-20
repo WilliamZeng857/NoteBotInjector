@@ -1,0 +1,33 @@
+# NoteBotAuth VMP protection table
+# columns: category<TAB>symbol_key<TAB>module<TAB>note
+# category: mutation | virtualize | ultra
+category	symbol_key	module	note
+mutation	NBVmp_Dll_SafeFileName	protected_download_ops	sanitize requested DLL file name before download handling
+virtualize	NBVmp_Dll_ParseSignedMetadata	protected_download_ops	parse and validate signed DLL metadata envelope
+ultra	NBVmp_Dll_VerifyDownloadedBytes	protected_download_ops	verify downloaded DLL size and hashes before trust
+mutation	NBVmp_Name_IsOriginalHook	protected_name_ops	compare hook bytes against expected original prologue
+mutation	NBVmp_Name_IsAlreadyPatched	protected_name_ops	detect whether the remote hook was already patched
+virtualize	NBVmp_Name_BuildShellcode	protected_name_ops	build remote shellcode payload for custom-name injection
+mutation	NBVmp_Name_MakeJmp5	protected_name_ops	compute 5-byte relative jump patch bytes
+mutation	NBVmp_V3_NormalizeKey	protected_v3_ops	normalize plaintext key input into canonical form
+virtualize	NBVmp_V3_HashKeySha256	protected_v3_ops	derive SHA-256 key hash used by V3 state
+mutation	NBVmp_V3_MakeKeyId	protected_v3_ops	derive stable key id from key hash prefix
+virtualize	NBVmp_V3_NormalizeFeatureFlags	protected_v3_ops	normalize and deduplicate V3 feature flag array
+virtualize	NBVmp_Ticket_ComputeTicketSha256	protected_ticket_ops	compute ticket sha256 from canonical server ticket payload
+ultra	NBVmp_Ticket_DeriveWrapperKey	protected_ticket_ops	derive wrapper key used by local ticket/result file chain
+ultra	NBVmp_Ticket_DecryptWrapper	protected_ticket_ops	decrypt AES-GCM wrapper for local inject ticket validation
+virtualize	NBVmp_Ticket_ParseWrapperJson	protected_ticket_ops	parse wrapper JSON fields before protected validation
+virtualize	NBVmp_Ticket_ParseServerTicket	protected_ticket_ops	parse signed inner ticket fields before protected validation
+virtualize	NBVmp_Ticket_CanonicalResultJson	protected_ticket_ops	build canonical result JSON covered by result hmac
+ultra	NBVmp_Ticket_ComputeResultHmacHex	protected_ticket_ops	compute result-file hmac over canonical result JSON with wrapper key
+mutation	NBVmp_Verify_SignatureHexToFixed	protected_verify_ops	convert lower-hex server signature into fixed-size RSA signature bytes
+mutation	NBVmp_Verify_FormalServerKeyReady	protected_verify_ops	validate embedded formal server key metadata before signature verification
+ultra	NBVmp_Verify_ServerTicketSignature	protected_verify_ops	verify RSA-SHA256 signature of the canonical server ticket payload
+mutation	NBVmp_Verify_TicketShaMatches	protected_verify_ops	compare expected and recomputed ticket sha256 values
+mutation	NBVmp_Verify_ServerKeyMetadataMatches	protected_verify_ops	compare embedded formal server key metadata with local license_v3 metadata
+mutation	NBVmp_Verify_TargetPid	protected_verify_ops	compare expected target pid with current injected process pid
+mutation	NBVmp_Verify_DllShaMatches	protected_verify_ops	compare expected DLL sha256 with the currently loaded business DLL hash
+ultra	NBVmp_Verify_TtlElapsed	protected_verify_ops	enforce local wrapper ttl window for inject ticket use
+ultra	NBVmp_Verify_ReplayEntryMatches	protected_verify_ops	match replay-cache ticket identity against the current ticket
+ultra	NBVmp_Verify_ResultHmacEquals	protected_verify_ops	compare expected and actual result hmac in the protected verify path
+ultra	NBVmp_Verify_FinalAllow	protected_verify_ops	guard the final allow branch after all protected inject-ticket checks pass

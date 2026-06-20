@@ -1,0 +1,38 @@
+# Build caches and generated outputs
+build__auth_dll_cache/
+build__injector_exe_cache/
+dist__release_artifacts/
+dist__vmp_auth_dll/
+
+# Temporary work areas
+_remote_patch/
+_remote_server_patch/
+_remote_server_work/
+_update_timing_test/
+
+# UI verification screenshots
+_injector_ui_*.png
+_ui_*.png
+
+# Admin console dependencies and frontend build output
+_admin_console_lab/admin-console/node_modules/
+_admin_console_lab/admin-console/dist/
+_admin_console_lab/admin-console/.vite/
+
+# Common binary/debug artifacts
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.obj
+*.lib
+*.exp
+*.map
+
+# Local editor/system noise
+.vs/
+.vscode/
+*.user
+*.suo
+Thumbs.db
+Desktop.ini

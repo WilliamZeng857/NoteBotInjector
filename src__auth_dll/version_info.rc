@@ -1,0 +1,33 @@
+#include <winver.h>
+
+1 VERSIONINFO
+FILEVERSION 3,5,50,0
+PRODUCTVERSION 3,5,50,0
+FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+FILEFLAGS VS_FF_DEBUG
+#else
+FILEFLAGS 0x0L
+#endif
+FILEOS VOS__WINDOWS32
+FILETYPE VFT_DLL
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404B0"
+        BEGIN
+            VALUE "CompanyName", "NoteBot\0"
+            VALUE "FileDescription", "NoteBot Auth DLL\0"
+            VALUE "FileVersion", "3.5.50.0\0"
+            VALUE "InternalName", "NoteBotAuth.dll\0"
+            VALUE "OriginalFilename", "NoteBotAuth.dll\0"
+            VALUE "ProductName", "NoteBot Auth DLL\0"
+            VALUE "ProductVersion", "3.5.50.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END

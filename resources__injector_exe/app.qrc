@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="avatar.ico">avatar.ico</file>
+        <file alias="shaders/modelpreview.vert.qsb">shaders/modelpreview.vert.qsb</file>
+        <file alias="shaders/modelpreview.frag.qsb">shaders/modelpreview.frag.qsb</file>
+        <file alias="qml/main.qml">../qml__injector_exe/main.qml</file>
+        <file alias="embedded/NoteBotUpdater.exe">embedded/NoteBotUpdater.exe</file>
+    </qresource>
+</RCC>

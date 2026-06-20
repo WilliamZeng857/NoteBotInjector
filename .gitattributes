@@ -1,0 +1,11 @@
+# Preserve repository bytes exactly. This project contains UTF-8 BOM files,
+# Chinese UI strings, QML, RC files, shaders, and generated shader blobs.
+* -text
+
+# Binary assets
+*.ico binary
+*.png binary
+*.qsb binary
+*.exe binary
+*.dll binary
+*.pdb binary
