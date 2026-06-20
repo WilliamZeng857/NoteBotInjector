@@ -883,12 +883,10 @@ Window {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: backend.modelReplacementStatus
-                                color: backend.modelReplacementStatus === "失败"
-                                       ? bad
-                                       : backend.modelReplacementRunning
-                                         ? accentCyan
-                                         : textSecondary
+                                text: backend.modelModificationEnabled
+                                      ? "开启后自动等待新进程"
+                                      : "关闭时不改启动阶段"
+                                color: textSecondary
                                 font.pixelSize: 10
                                 font.family: "Microsoft YaHei UI"
                                 elide: Text.ElideRight
@@ -896,42 +894,36 @@ Window {
                         }
 
                         Rectangle {
-                            id: modelReplacementAction
-                            Layout.preferredWidth: 92
+                            id: modelReplacementStateBadge
+                            Layout.preferredWidth: 96
                             Layout.preferredHeight: 26
                             radius: 7
-                            enabled: backend.modelModificationEnabled
-                            opacity: enabled ? 1 : 0.45
-                            color: modelActionHover.hovered && enabled
-                                   ? Qt.rgba(0.545, 0.361, 0.965, 0.24)
-                                   : Qt.rgba(0.545, 0.361, 0.965, 0.14)
-                            border.color: modelActionHover.hovered && enabled
-                                          ? Qt.rgba(0.545, 0.361, 0.965, 0.50)
-                                          : Qt.rgba(0.545, 0.361, 0.965, 0.28)
+                            color: backend.modelReplacementStatus === "失败"
+                                   ? Qt.rgba(0.937, 0.267, 0.267, 0.14)
+                                   : backend.modelReplacementRunning
+                                     ? Qt.rgba(0.133, 0.827, 0.933, 0.15)
+                                     : Qt.rgba(1, 1, 1, 0.055)
+                            border.color: backend.modelReplacementStatus === "失败"
+                                          ? Qt.rgba(0.937, 0.267, 0.267, 0.34)
+                                          : backend.modelReplacementRunning
+                                            ? Qt.rgba(0.133, 0.827, 0.933, 0.36)
+                                            : Qt.rgba(1, 1, 1, 0.10)
                             border.width: 1
 
                             Text {
                                 anchors.fill: parent
-                                text: backend.modelReplacementRunning ? "停止等待" : "等待下次启动"
-                                color: "#F6F0FF"
+                                text: backend.modelReplacementStatus
+                                color: backend.modelReplacementStatus === "失败"
+                                       ? "#FCA5A5"
+                                       : backend.modelReplacementRunning
+                                         ? accentCyan
+                                         : textSecondary
                                 font.pixelSize: 10
                                 font.bold: true
                                 font.family: "Microsoft YaHei UI"
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
-                            }
-
-                            HoverHandler { id: modelActionHover; enabled: modelReplacementAction.enabled }
-                            TapHandler {
-                                enabled: modelReplacementAction.enabled
-                                onTapped: {
-                                    if (backend.modelReplacementRunning) {
-                                        backend.stopModelReplacementWait()
-                                    } else {
-                                        backend.startModelReplacementWait()
-                                    }
-                                }
                             }
                         }
                     }
