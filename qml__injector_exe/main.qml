@@ -865,8 +865,9 @@ Window {
 
                 Rectangle {
                     id: modelReplacementStrip
+                    visible: backend.modelRuntimeAvailable
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 42
+                    Layout.preferredHeight: visible ? 42 : 0
                     radius: 8
                     color: modelReplacementTapRestored.pressed
                            ? (backend.modelModificationEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : Qt.rgba(1, 1, 1, 0.085))

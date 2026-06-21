@@ -214,6 +214,12 @@ static QString injectorModelsCacheDir()
     return QDir(injectorLocalDataDir()).absoluteFilePath(QStringLiteral("models_v1"));
 }
 
+static QString injectorModelRuntimeDllPath()
+{
+    return QDir(injectorLocalDataDir())
+        .absoluteFilePath(QStringLiteral("model_runtime_v1/NoteBotModel.dll"));
+}
+
 static QString activeModelSettingKey(const QString &licenseKey)
 {
     const QString keyId = makeLocalKeyId(licenseKey);
@@ -678,7 +684,7 @@ void Backend::setAuthSessionVerified(bool verified)
         });
     } else {
         stopModelReplacementWait();
-        if (m_modelModificationEnabled) {
+        if (m_modelModificationEnabled && m_modelRuntimeAvailable) {
             setModelReplacementStatus(QStringLiteral("等待密钥验证"));
         }
         clearModelCatalog();
@@ -738,6 +744,11 @@ void Backend::activateModel(const QString &modelId)
 
 void Backend::setModelModificationEnabled(bool enabled)
 {
+    if (enabled && !m_modelRuntimeAvailable) {
+        setModelReplacementStatus(QStringLiteral("不可用"));
+        m_logModel->append(QStringLiteral("[MODEL] 模型替换运行时尚未授权或下载完成"));
+        return;
+    }
     if (m_modelModificationEnabled == enabled) {
         return;
     }
@@ -765,6 +776,10 @@ void Backend::setModelModificationEnabled(bool enabled)
 
 void Backend::startModelReplacementWait()
 {
+    if (!m_modelRuntimeAvailable) {
+        setModelReplacementStatus(QStringLiteral("不可用"));
+        return;
+    }
     if (!m_modelModificationEnabled) {
         m_logModel->append(QStringLiteral("[MODEL] 启动阶段模型替换已关闭"));
         setModelReplacementStatus(QStringLiteral("已关闭"));
@@ -1003,7 +1018,7 @@ void Backend::refreshModelEntitlementsAsync()
                 m_logModel->append(QStringLiteral("[MODEL] 模型列表已刷新：%1 个")
                                        .arg(entries.size()));
             }
-            if (m_modelModificationEnabled) {
+            if (m_modelModificationEnabled && m_modelRuntimeAvailable) {
                 startModelReplacementWait();
             }
         }, Qt::QueuedConnection);
@@ -1149,10 +1164,10 @@ bool Backend::loadModelDll()
         return true;
     }
 
-    const QString appDir = QCoreApplication::applicationDirPath();
-    const QString dllPath = QDir(appDir).absoluteFilePath(QStringLiteral("NoteBotModel.dll"));
+    const QString dllPath = injectorModelRuntimeDllPath();
     if (!QFile::exists(dllPath)) {
-        m_logModel->append(QStringLiteral("[MODEL] 未找到 NoteBotModel.dll"));
+        setModelRuntimeAvailable(false);
+        m_logModel->append(QStringLiteral("[MODEL] 模型替换运行时未准备好"));
         setModelReplacementStatus(QStringLiteral("失败"));
         return false;
     }
@@ -1194,6 +1209,7 @@ bool Backend::loadModelDll()
         return false;
     }
     m_logModel->append(QStringLiteral("[MODEL] 模型替换模块加载成功"));
+    setModelRuntimeAvailable(true);
     return true;
 }
 
@@ -1246,6 +1262,15 @@ void Backend::setModelReplacementRunning(bool running)
     }
     m_modelReplacementRunning = running;
     emit modelReplacementRunningChanged();
+}
+
+void Backend::setModelRuntimeAvailable(bool available)
+{
+    if (m_modelRuntimeAvailable == available) {
+        return;
+    }
+    m_modelRuntimeAvailable = available;
+    emit modelRuntimeAvailableChanged();
 }
 
 void Backend::setModelReplacementStatus(const QString &status)

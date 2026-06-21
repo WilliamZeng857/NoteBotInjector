@@ -33,6 +33,7 @@ class Backend : public QObject
     Q_PROPERTY(int injectProgress READ injectProgress NOTIFY injectProgressChanged)
     Q_PROPERTY(QString injectStageText READ injectStageText NOTIFY injectStageTextChanged)
     Q_PROPERTY(bool modelModificationEnabled READ modelModificationEnabled WRITE setModelModificationEnabled NOTIFY modelModificationEnabledChanged)
+    Q_PROPERTY(bool modelRuntimeAvailable READ modelRuntimeAvailable NOTIFY modelRuntimeAvailableChanged)
     Q_PROPERTY(bool modelReplacementRunning READ modelReplacementRunning NOTIFY modelReplacementRunningChanged)
     Q_PROPERTY(QString modelReplacementStatus READ modelReplacementStatus NOTIFY modelReplacementStatusChanged)
     Q_PROPERTY(bool initializing READ initializing NOTIFY initializingChanged)
@@ -61,6 +62,7 @@ public:
     int injectProgress() const { return m_injectProgress; }
     QString injectStageText() const { return m_injectStageText; }
     bool modelModificationEnabled() const { return m_modelModificationEnabled; }
+    bool modelRuntimeAvailable() const { return m_modelRuntimeAvailable; }
     bool modelReplacementRunning() const { return m_modelReplacementRunning; }
     QString modelReplacementStatus() const { return m_modelReplacementStatus; }
     void setModelModificationEnabled(bool enabled);
@@ -100,6 +102,7 @@ signals:
     void injectProgressChanged();
     void injectStageTextChanged();
     void modelModificationEnabledChanged();
+    void modelRuntimeAvailableChanged();
     void modelReplacementRunningChanged();
     void modelReplacementStatusChanged();
     void splashFinished();
@@ -139,6 +142,7 @@ private:
     bool loadModelDll();
     void unloadModelDll();
     void setModelReplacementRunning(bool running);
+    void setModelRuntimeAvailable(bool available);
     void setModelReplacementStatus(const QString &status);
     void requestModelReplacementRestart();
     void syncStatusFromDll();
@@ -184,6 +188,7 @@ private:
     QString m_injectStageText;
     bool m_injectRunning = false;
     bool m_modelModificationEnabled = false;
+    bool m_modelRuntimeAvailable = false;
     bool m_modelReplacementRunning = false;
     bool m_modelReplacementRestartPending = false;
     QString m_modelReplacementStatus = "已关闭";
