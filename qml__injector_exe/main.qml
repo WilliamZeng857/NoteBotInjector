@@ -267,11 +267,11 @@ Window {
             anchors.top: progressTrack.bottom
             anchors.topMargin: 12
             text: backend.downloadProgress >= 0
-                  ? ("濮濓絽婀稉瀣祰閺囧瓨鏌? " + Math.max(0, Math.min(100, backend.downloadProgress)) + "%")
+                  ? ("正在下载更新 " + Math.max(0, Math.min(100, backend.downloadProgress)) + "%")
                   : (backend.initStatus === "" ? "READY" : backend.initStatus)
             color: textSecondary
             font.pixelSize: 11
-            font.family: "Consolas"
+            font.family: "Microsoft YaHei UI"
             opacity: 0.72
         }
 
