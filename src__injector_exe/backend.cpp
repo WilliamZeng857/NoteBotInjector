@@ -1751,6 +1751,7 @@ void Backend::checkDllUpdateAsyncInternal()
 
     QString localDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     QString mainPath = QDir(localDir).absoluteFilePath("NoteBotAuth.dll");
+    QString updaterMainPath = installedUpdaterPath();
     QString mainMd5 = QFile::exists(mainPath) ? computeFileMd5(mainPath) : QString();
     QString mainSha256 = QFile::exists(mainPath) ? computeFileSha256(mainPath) : QString();
     Q_UNUSED(mainMd5);
@@ -1766,17 +1767,39 @@ void Backend::checkDllUpdateAsyncInternal()
                                       QString::fromLatin1(kCurrentUpdaterVersion),
                                       kCurrentUpdaterVersionCode);
 
+    auto keepArtifactForUpdate = [](const Updater::ArtifactInfo &artifact,
+                                    int currentVersionCode,
+                                    bool allowSameVersionWhenMissing,
+                                    const QString &localPath) -> bool {
+        if (artifact.fileName.isEmpty()) {
+            return false;
+        }
+        if (artifact.versionCode <= 0 || artifact.versionCode < currentVersionCode) {
+            return false;
+        }
+        if (artifact.versionCode == currentVersionCode) {
+            return allowSameVersionWhenMissing && !localPath.isEmpty() && !QFile::exists(localPath);
+        }
+        return true;
+    };
+
     auto normalizeUpdateInfo = [&](Updater::UpdateInfo &updateInfo) {
-        if (!updateInfo.mainExe.fileName.isEmpty() &&
-            updateInfo.mainExe.versionCode < kCurrentMainVersionCode) {
+        if (!keepArtifactForUpdate(updateInfo.mainExe,
+                                   kCurrentMainVersionCode,
+                                   false,
+                                   QString())) {
             updateInfo.mainExe = Updater::ArtifactInfo();
         }
-        if (!updateInfo.authDll.fileName.isEmpty() &&
-            updateInfo.authDll.versionCode < kCurrentAuthDllVersionCode) {
+        if (!keepArtifactForUpdate(updateInfo.authDll,
+                                   kCurrentAuthDllVersionCode,
+                                   true,
+                                   mainPath)) {
             updateInfo.authDll = Updater::ArtifactInfo();
         }
-        if (!updateInfo.updaterExe.fileName.isEmpty() &&
-            updateInfo.updaterExe.versionCode < kCurrentUpdaterVersionCode) {
+        if (!keepArtifactForUpdate(updateInfo.updaterExe,
+                                   kCurrentUpdaterVersionCode,
+                                   true,
+                                   updaterMainPath)) {
             updateInfo.updaterExe = Updater::ArtifactInfo();
         }
         updateInfo.hasAnyArtifact = !updateInfo.mainExe.fileName.isEmpty() ||
@@ -1841,16 +1864,15 @@ void Backend::checkDllUpdateAsyncInternal()
     m_authUpdateRequired = false;
     if (!info.updaterExe.fileName.isEmpty()) {
         logFromThread("[UPD] 检测到更新器更新项");
-        const QString installedUpdater = installedUpdaterPath();
         const QString updaterCachePath = QDir(localDir).absoluteFilePath(
             QStringLiteral("updates/updater/%1-%2-%3.bin")
                 .arg(info.updaterExe.artifactType,
                      info.updaterExe.version,
                      info.updaterExe.fileSha256.isEmpty() ? QStringLiteral("nosha")
                                                           : info.updaterExe.fileSha256.left(12)));
-        if (fileMatchesArtifact(installedUpdater, info.updaterExe)) {
+        if (fileMatchesArtifact(updaterMainPath, info.updaterExe)) {
             logFromThread("[UPD] updater.exe 已匹配清单版本");
-            downloadedUpdaterPath = installedUpdater;
+            downloadedUpdaterPath = updaterMainPath;
         } else if (fileMatchesArtifact(updaterCachePath, info.updaterExe)) {
             logFromThread("[UPD] 本地缓存已有相同 updater.exe，无需重复下载");
             downloadedUpdaterPath = updaterCachePath;
