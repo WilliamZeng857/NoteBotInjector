@@ -25,7 +25,6 @@ C:\NB
 ├─ src__auth_dll/              NoteBotAuth.dll 授权、状态、注入 API
 ├─ src__updater_exe/           NoteBotUpdater.exe 更新器
 ├─ tools__project_helpers/     构建、MAP、VMP 辅助脚本
-├─ _admin_console_lab/         管理端实验界面
 ├─ build_all.bat               增量构建 DLL + EXE
 ├─ build_clean.bat             清理并重新配置构建
 └─ build_dll.bat               只构建 Auth DLL

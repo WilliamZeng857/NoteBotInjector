@@ -14,11 +14,6 @@ _update_timing_test/
 _injector_ui_*.png
 _ui_*.png
 
-# Admin console dependencies and frontend build output
-_admin_console_lab/admin-console/node_modules/
-_admin_console_lab/admin-console/dist/
-_admin_console_lab/admin-console/.vite/
-
 # Common binary/debug artifacts
 *.exe
 *.dll
