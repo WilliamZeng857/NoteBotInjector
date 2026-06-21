@@ -145,6 +145,7 @@ private:
     void setModelRuntimeAvailable(bool available);
     void setModelReplacementStatus(const QString &status);
     void requestModelReplacementRestart();
+    void disableModelRuntimeAndRemoveLocal(const QString &status, bool removeLocalDll);
     void syncStatusFromDll();
     void syncHostUpdateSnapshot(const QString &state, bool authDllPendingReplace = false);
     void checkDllUpdateAsyncInternal();

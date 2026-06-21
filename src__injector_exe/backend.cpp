@@ -689,11 +689,7 @@ void Backend::setAuthSessionVerified(bool verified)
             refreshModelEntitlementsAsync();
         });
     } else {
-        stopModelReplacementWait();
-        setModelRuntimeAvailable(false);
-        if (m_modelModificationEnabled) {
-            setModelReplacementStatus(QStringLiteral("等待密钥验证"));
-        }
+        disableModelRuntimeAndRemoveLocal(QStringLiteral("等待密钥验证"), true);
         clearModelCatalog();
     }
 }
@@ -1040,7 +1036,7 @@ void Backend::refreshModelEntitlementsAsync()
 void Backend::refreshModelRuntimeAsync()
 {
     if (!m_authSessionVerified || !m_funcs) {
-        setModelRuntimeAvailable(false);
+        disableModelRuntimeAndRemoveLocal(QStringLiteral("等待密钥验证"), true);
         return;
     }
 
@@ -1050,15 +1046,11 @@ void Backend::refreshModelRuntimeAsync()
             ? computeFileSha256(runtimePath)
             : QString();
 
-        auto markRuntimeUnavailable = [this](const QString &status = QStringLiteral("不可用")) {
-            QMetaObject::invokeMethod(this, [this, status]() {
-                if (m_modelReplacementRunning || m_modelFuncs) {
-                    unloadModelDll();
-                }
-                setModelRuntimeAvailable(false);
-                if (m_modelModificationEnabled) {
-                    setModelReplacementStatus(status);
-                }
+        auto markRuntimeUnavailable = [this](
+                                          const QString &status = QStringLiteral("不可用"),
+                                          bool removeLocalDll = false) {
+            QMetaObject::invokeMethod(this, [this, status, removeLocalDll]() {
+                disableModelRuntimeAndRemoveLocal(status, removeLocalDll);
             }, Qt::QueuedConnection);
         };
 
@@ -1079,7 +1071,7 @@ void Backend::refreshModelRuntimeAsync()
 
         const QJsonObject data = resp.value(QStringLiteral("data")).toObject();
         if (!data.value(QStringLiteral("runtime_enabled")).toBool(false)) {
-            markRuntimeUnavailable();
+            markRuntimeUnavailable(QStringLiteral("未授权"), true);
             return;
         }
 
@@ -1378,6 +1370,36 @@ void Backend::requestModelReplacementRestart()
         m_logModel->append(QStringLiteral("[MODEL] 模型已切换，正在重新等待新游戏进程"));
     } else {
         m_logModel->append(QStringLiteral("[MODEL] 模型已切换，本轮替换完成后生效"));
+    }
+}
+
+void Backend::disableModelRuntimeAndRemoveLocal(const QString &status, bool removeLocalDll)
+{
+    if (m_modelReplacementRunning || m_modelFuncs) {
+        stopModelReplacementWait();
+    }
+    if (m_modelFuncs) {
+        unloadModelDll();
+    }
+    setModelRuntimeAvailable(false);
+    if (m_modelModificationEnabled) {
+        setModelReplacementStatus(status);
+    } else {
+        setModelReplacementStatus(QStringLiteral("已关闭"));
+    }
+
+    if (!removeLocalDll) {
+        return;
+    }
+
+    const QString runtimePath = injectorModelRuntimeDllPath();
+    if (!QFile::exists(runtimePath)) {
+        return;
+    }
+    if (QFile::remove(runtimePath)) {
+        m_logModel->append(QStringLiteral("[MODEL] 云端未授权，已移除本地模型运行时"));
+    } else {
+        m_logModel->append(QStringLiteral("[MODEL] 云端未授权，本地模型运行时将在重启后彻底失效"));
     }
 }
 
