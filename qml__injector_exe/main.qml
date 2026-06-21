@@ -1558,6 +1558,16 @@ Window {
                     Text {
                         width: parent.width
                         horizontalAlignment: Text.AlignRight
+                        text: "技术实现、界面迭代与构建流程由 AI 代理持续参与"
+                        color: Qt.rgba(1, 1, 1, 0.18)
+                        font.pixelSize: 10
+                        font.family: "Microsoft YaHei UI"
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignRight
                         text: "非 Mojang 或 Microsoft 官方产品"
                         color: Qt.rgba(1, 1, 1, 0.16)
                         font.pixelSize: 10
