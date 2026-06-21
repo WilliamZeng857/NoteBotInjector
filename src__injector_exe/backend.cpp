@@ -132,7 +132,7 @@ static QString sanitizeModelLogMessage(QString msg)
     if (msg.contains(QStringLiteral("name-anchored resolver failed")) ||
         msg.contains(QStringLiteral("resolver failed")) ||
         msg.contains(QStringLiteral("resolver incomplete"))) {
-        return QStringLiteral("[MODEL] 定位替换点失败");
+        return QStringLiteral("[MODEL] 替换点暂不可用");
     }
 
     return sanitizeUiLogMessage(msg);

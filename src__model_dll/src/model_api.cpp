@@ -847,7 +847,8 @@ std::vector<HookDef> selectedHooks(const PayloadConfig &cfg)
 bool resolveHookAddresses(HANDLE process,
                           quint64 base,
                           quint32 size,
-                          std::vector<HookDef> *hooks)
+                          std::vector<HookDef> *hooks,
+                          bool logFailures)
 {
     const auto &locators = hookLocators();
     const auto &groups = groupRequirements();
@@ -872,7 +873,9 @@ bool resolveHookAddresses(HANDLE process,
         textSection = sectionContainingRva(sections, base, preferred);
     }
     if (!textSection) {
-        emitLog(QStringLiteral("[MODEL] 定位替换点失败：模块段不可用"));
+        if (logFailures) {
+            emitLog(QStringLiteral("[MODEL] 替换点暂不可用：模块尚未准备好"));
+        }
         return false;
     }
 
@@ -889,7 +892,9 @@ bool resolveHookAddresses(HANDLE process,
 
     const QByteArray textData = readMem(process, textSection->start, textSection->size);
     if (textData.isEmpty()) {
-        emitLog(QStringLiteral("[MODEL] 定位替换点失败：模块读取失败"));
+        if (logFailures) {
+            emitLog(QStringLiteral("[MODEL] 替换点暂不可用：模块读取失败"));
+        }
         return false;
     }
 
@@ -980,7 +985,9 @@ bool resolveHookAddresses(HANDLE process,
             }
         }
         if (scored.empty()) {
-            emitLog(QStringLiteral("[MODEL] 定位替换点失败：目标字段未匹配"));
+            if (logFailures) {
+                emitLog(QStringLiteral("[MODEL] 替换点暂不可用：请确认游戏版本和启动时机"));
+            }
             return false;
         }
         std::sort(scored.begin(), scored.end(), [](const Score &a, const Score &b) {
@@ -1040,7 +1047,9 @@ bool resolveHookAddresses(HANDLE process,
                                    compat.second);
     }
     if (!unresolved.empty()) {
-        emitLog(QStringLiteral("[MODEL] 定位替换点失败：替换点不完整"));
+        if (logFailures) {
+            emitLog(QStringLiteral("[MODEL] 替换点暂不可用：准备信息不完整"));
+        }
         return false;
     }
     return true;
@@ -1333,7 +1342,7 @@ bool probeProcessReady(DWORD pid, const PayloadConfig &cfg)
         return false;
     }
     std::vector<HookDef> hooks = selectedHooks(cfg);
-    if (!resolveHookAddresses(process.h, module->base, module->size, &hooks)) {
+    if (!resolveHookAddresses(process.h, module->base, module->size, &hooks, false)) {
         return false;
     }
     for (const HookDef &hook : hooks) {
@@ -1379,7 +1388,7 @@ bool patchProcess(DWORD pid, const PayloadConfig &cfg)
     }
 
     std::vector<HookDef> hooks = selectedHooks(cfg);
-    if (!resolveHookAddresses(process.h, module->base, module->size, &hooks)) {
+    if (!resolveHookAddresses(process.h, module->base, module->size, &hooks, true)) {
         return false;
     }
 
