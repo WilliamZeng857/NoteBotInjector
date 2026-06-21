@@ -1073,10 +1073,9 @@ Window {
                 anchors.fill: parent
                 anchors.margins: 20
                 spacing: 12
-                visible: mainUI.detailPanel !== "settings"
 
                 Item {
-                    visible: true
+                    visible: mainUI.detailPanel !== "settings"
                     Layout.fillWidth: true
                     Layout.fillHeight: false
                     Layout.preferredHeight: 150
@@ -1210,13 +1209,13 @@ Window {
                 }
 
                 Item {
-                    visible: true
+                    visible: mainUI.detailPanel !== "settings"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
 
                 Rectangle {
-                    visible: true
+                    visible: mainUI.detailPanel !== "settings"
                     Layout.fillWidth: true
                     Layout.fillHeight: false
                     Layout.preferredHeight: Math.max(320, Math.floor(restoredContentArea.height * 0.5))
@@ -1522,23 +1521,24 @@ Window {
 
         }
 
-            Item {
+            Rectangle {
                 id: settingsPageRestored
-                anchors.fill: parent
-                anchors.margins: 20
+                Layout.fillWidth: true
+                Layout.fillHeight: true
                 visible: mainUI.detailPanel === "settings"
+                color: "#08080C"
 
                 Flickable {
                     anchors.fill: parent
                     clip: true
-                    contentWidth: width
-                    contentHeight: aboutColumnRestored.implicitHeight
+                    contentWidth: settingsPageRestored.width
+                    contentHeight: aboutColumnRestored.height + 8
                     boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
                     Column {
                         id: aboutColumnRestored
-                        width: parent.width
+                        width: settingsPageRestored.width
                         spacing: 18
 
                         RowLayout {
