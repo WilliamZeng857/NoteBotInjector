@@ -1521,12 +1521,11 @@ Window {
 
         }
 
-            Rectangle {
+            Item {
                 id: settingsPageRestored
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: mainUI.detailPanel === "settings"
-                color: "#08080C"
 
                 Column {
                     anchors.right: parent.right
