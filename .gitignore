@@ -2,6 +2,7 @@
 build__auth_dll_cache/
 build__injector_exe_cache/
 dist__release_artifacts/
+dist__model_runtime_artifacts/
 dist__vmp_auth_dll/
 
 # Temporary work areas

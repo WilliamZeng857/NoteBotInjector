@@ -74,6 +74,12 @@ build_dll.bat
 dist__release_artifacts/NoteBotInjector.exe
 ```
 
+模型替换运行时 DLL 只作为独立云端分发产物输出，不随 EXE 发布目录同级放置：
+
+```text
+dist__model_runtime_artifacts/NoteBotModel.dll
+```
+
 授权 DLL 构建产物位于：
 
 ```text

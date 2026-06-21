@@ -549,9 +549,6 @@ Window {
                             id: settingsTapRestored
                             onTapped: mainUI.detailPanel = "settings"
                         }
-                        ToolTip.visible: settingsHoverRestored.hovered
-                        ToolTip.text: "设置"
-                        ToolTip.delay: 350
                     }
                 }
 
