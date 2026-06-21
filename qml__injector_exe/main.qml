@@ -1073,6 +1073,7 @@ Window {
                 anchors.fill: parent
                 anchors.margins: 20
                 spacing: 12
+                visible: mainUI.detailPanel !== "settings"
 
                 Item {
                     visible: true
@@ -1230,8 +1231,6 @@ Window {
                         y: 8
                         text: mainUI.detailPanel === "models"
                               ? "MODELS"
-                              : mainUI.detailPanel === "settings"
-                                ? "SETTINGS"
                               : "LOG"
                         color: textSecondary
                         font.pixelSize: 10
@@ -1521,151 +1520,14 @@ Window {
                         }
                     }
 
-                    Item {
-                        id: settingsPanelRestored
-                        anchors.fill: parent
-                        anchors.margins: 10
-                        anchors.topMargin: 26
-                        visible: mainUI.detailPanel === "settings"
-                        clip: true
-
-                        Column {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            spacing: 10
-
-                            Rectangle {
-                                width: parent.width
-                                height: 54
-                                radius: 8
-                                color: Qt.rgba(1, 1, 1, 0.026)
-                                border.width: 1
-                                border.color: Qt.rgba(1, 1, 1, 0.06)
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 10
-
-                                    Column {
-                                        Layout.fillWidth: true
-                                        spacing: 3
-                                        Text {
-                                            width: parent.width
-                                            text: "密钥状态"
-                                            color: textPrimary
-                                            font.pixelSize: 13
-                                            font.bold: true
-                                            font.family: "Microsoft YaHei UI"
-                                            elide: Text.ElideRight
-                                        }
-                                        Text {
-                                            width: parent.width
-                                            text: backend.licenseStatus && backend.licenseStatus.length > 0
-                                                  ? backend.licenseStatus
-                                                  : "未验证"
-                                            color: textSecondary
-                                            font.pixelSize: 11
-                                            font.family: "Microsoft YaHei UI"
-                                            elide: Text.ElideRight
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        Layout.preferredWidth: 74
-                                        Layout.preferredHeight: 24
-                                        radius: 6
-                                        color: backend.authSessionVerified ? Qt.rgba(0.133, 0.827, 0.933, 0.13)
-                                                                            : Qt.rgba(1, 1, 1, 0.05)
-                                        border.width: 1
-                                        border.color: backend.authSessionVerified ? Qt.rgba(0.133, 0.827, 0.933, 0.38)
-                                                                                  : Qt.rgba(1, 1, 1, 0.09)
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: backend.authSessionVerified ? "已验证" : "待验证"
-                                            color: backend.authSessionVerified ? accentCyan : textSecondary
-                                            font.pixelSize: 11
-                                            font.bold: true
-                                            font.family: "Microsoft YaHei UI"
-                                        }
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                width: parent.width
-                                height: 58
-                                radius: 8
-                                color: modelSettingTapRestored.pressed
-                                       ? (backend.modelModificationEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : Qt.rgba(1, 1, 1, 0.075))
-                                       : backend.modelModificationEnabled
-                                         ? (modelSettingHoverRestored.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055))
-                                         : (modelSettingHoverRestored.hovered ? Qt.rgba(1, 1, 1, 0.058) : Qt.rgba(1, 1, 1, 0.026))
-                                border.width: 1
-                                border.color: backend.modelModificationEnabled
-                                              ? Qt.rgba(0.133, 0.827, 0.933, 0.36)
-                                              : Qt.rgba(1, 1, 1, 0.07)
-                                Behavior on color { ColorAnimation { duration: 130 } }
-                                Behavior on border.color { ColorAnimation { duration: 130 } }
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 10
-
-                                    Column {
-                                        Layout.fillWidth: true
-                                        spacing: 3
-                                        Text {
-                                            width: parent.width
-                                            text: "启动阶段模型替换"
-                                            color: textPrimary
-                                            font.pixelSize: 13
-                                            font.bold: true
-                                            font.family: "Microsoft YaHei UI"
-                                            elide: Text.ElideRight
-                                        }
-                                        Text {
-                                            width: parent.width
-                                            text: backend.modelReplacementStatus
-                                            color: backend.modelModificationEnabled ? accentCyan : textSecondary
-                                            font.pixelSize: 11
-                                            font.family: "Microsoft YaHei UI"
-                                            elide: Text.ElideRight
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        Layout.preferredWidth: 54
-                                        Layout.preferredHeight: 24
-                                        radius: 6
-                                        color: backend.modelModificationEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.15)
-                                                                                : Qt.rgba(1, 1, 1, 0.05)
-                                        border.width: 1
-                                        border.color: backend.modelModificationEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.40)
-                                                                                      : Qt.rgba(1, 1, 1, 0.09)
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: backend.modelModificationEnabled ? "开启" : "关闭"
-                                            color: backend.modelModificationEnabled ? accentCyan : textSecondary
-                                            font.pixelSize: 11
-                                            font.bold: true
-                                            font.family: "Microsoft YaHei UI"
-                                        }
-                                    }
-                                }
-
-                                HoverHandler { id: modelSettingHoverRestored }
-                                TapHandler {
-                                    id: modelSettingTapRestored
-                                    onTapped: backend.modelModificationEnabled = !backend.modelModificationEnabled
-                                }
-                            }
-                        }
-                    }
-
         }
+
+            Item {
+                id: settingsPageRestored
+                anchors.fill: parent
+                anchors.margins: 20
+                visible: mainUI.detailPanel === "settings"
+            }
     }
 }
     }
