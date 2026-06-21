@@ -220,6 +220,11 @@ static QString injectorModelRuntimeDllPath()
         .absoluteFilePath(QStringLiteral("model_runtime_v1/NoteBotModel.dll"));
 }
 
+static QString injectorModelRuntimeCacheSubdir()
+{
+    return QStringLiteral("model_runtime_v1");
+}
+
 static QString activeModelSettingKey(const QString &licenseKey)
 {
     const QString keyId = makeLocalKeyId(licenseKey);
@@ -680,11 +685,13 @@ void Backend::setAuthSessionVerified(bool verified)
     emit authSessionVerifiedChanged();
     if (verified) {
         QTimer::singleShot(0, this, [this]() {
+            refreshModelRuntimeAsync();
             refreshModelEntitlementsAsync();
         });
     } else {
         stopModelReplacementWait();
-        if (m_modelModificationEnabled && m_modelRuntimeAvailable) {
+        setModelRuntimeAvailable(false);
+        if (m_modelModificationEnabled) {
             setModelReplacementStatus(QStringLiteral("等待密钥验证"));
         }
         clearModelCatalog();
@@ -777,6 +784,11 @@ void Backend::setModelModificationEnabled(bool enabled)
 void Backend::startModelReplacementWait()
 {
     if (!m_modelRuntimeAvailable) {
+        setModelReplacementStatus(QStringLiteral("不可用"));
+        return;
+    }
+    if (!QFile::exists(injectorModelRuntimeDllPath())) {
+        setModelRuntimeAvailable(false);
         setModelReplacementStatus(QStringLiteral("不可用"));
         return;
     }
@@ -1020,6 +1032,120 @@ void Backend::refreshModelEntitlementsAsync()
             }
             if (m_modelModificationEnabled && m_modelRuntimeAvailable) {
                 startModelReplacementWait();
+            }
+        }, Qt::QueuedConnection);
+    }).detach();
+}
+
+void Backend::refreshModelRuntimeAsync()
+{
+    if (!m_authSessionVerified || !m_funcs) {
+        setModelRuntimeAvailable(false);
+        return;
+    }
+
+    std::thread([this]() {
+        const QString runtimePath = injectorModelRuntimeDllPath();
+        const QString currentSha256 = QFile::exists(runtimePath)
+            ? computeFileSha256(runtimePath)
+            : QString();
+
+        auto markRuntimeUnavailable = [this](const QString &status = QStringLiteral("不可用")) {
+            QMetaObject::invokeMethod(this, [this, status]() {
+                if (m_modelReplacementRunning || m_modelFuncs) {
+                    unloadModelDll();
+                }
+                setModelRuntimeAvailable(false);
+                if (m_modelModificationEnabled) {
+                    setModelReplacementStatus(status);
+                }
+            }, Qt::QueuedConnection);
+        };
+
+        QJsonObject req;
+        req[QStringLiteral("current_runtime_sha256")] = currentSha256;
+        const QJsonObject resp =
+            parseDllJsonObject(callDll(QStringLiteral("model_runtime_policy_v1"),
+                QString::fromUtf8(QJsonDocument(req).toJson(QJsonDocument::Compact))));
+
+        const int rc = resp.value(QStringLiteral("rc")).toInt(NB_ERR_OTHER);
+        const QString message = resp.value(QStringLiteral("message")).toString();
+        if (rc != NB_OK) {
+            logFromThread(QStringLiteral("[MODEL] 模型替换运行时暂不可用：%1")
+                              .arg(describeV3Rc(rc, message)));
+            markRuntimeUnavailable();
+            return;
+        }
+
+        const QJsonObject data = resp.value(QStringLiteral("data")).toObject();
+        if (!data.value(QStringLiteral("runtime_enabled")).toBool(false)) {
+            markRuntimeUnavailable();
+            return;
+        }
+
+        Updater::ArtifactInfo artifact;
+        artifact.artifactType = QStringLiteral("model_runtime");
+        artifact.channel = data.value(QStringLiteral("channel")).toString(QStringLiteral("stable"));
+        artifact.version = data.value(QStringLiteral("dll_sha256")).toString().left(12);
+        artifact.fileName = data.value(QStringLiteral("dll_name")).toString().trimmed();
+        artifact.fileSha256 =
+            data.value(QStringLiteral("dll_sha256")).toString().trimmed().toLower();
+        artifact.fileMd5 = data.value(QStringLiteral("dll_md5")).toString().trimmed().toLower();
+        artifact.fileSize = data.value(QStringLiteral("dll_size")).toVariant().toLongLong();
+        artifact.downloadUrl = QUrl(data.value(QStringLiteral("download_url")).toString().trimmed());
+        const int expiresIn = data.value(QStringLiteral("expires_in")).toInt(0);
+        const int runtimeProtocol = data.value(QStringLiteral("runtime_protocol")).toInt(1);
+        const int runtimeAbi = data.value(QStringLiteral("runtime_abi")).toInt(2);
+
+        if (artifact.fileName.isEmpty() ||
+            artifact.fileSha256.isEmpty() ||
+            artifact.fileSize <= 0 ||
+            !artifact.downloadUrl.isValid() ||
+            runtimeProtocol != kExpectedModelProtocolVersion ||
+            runtimeAbi != kExpectedModelAbiVersion) {
+            logFromThread(QStringLiteral("[MODEL] 模型替换运行时策略无效"));
+            markRuntimeUnavailable();
+            return;
+        }
+
+        bool ready = fileMatchesSha256AndSize(runtimePath, artifact.fileSha256, artifact.fileSize);
+        if (!ready) {
+            Updater updater;
+            updater.setLogCallback([this](const QString &msg) {
+                if (msg.contains(QStringLiteral("[ERR]"))) {
+                    logFromThread(QStringLiteral("[MODEL] %1").arg(msg));
+                }
+            });
+            logFromThread(QStringLiteral("[MODEL] 正在准备模型替换运行时"));
+            const QString cachedPath =
+                updater.downloadArtifact(artifact, injectorModelRuntimeCacheSubdir(), expiresIn);
+            if (cachedPath.isEmpty() || !ensureParentDir(runtimePath)) {
+                logFromThread(QStringLiteral("[MODEL] 模型替换运行时下载失败"));
+                markRuntimeUnavailable();
+                return;
+            }
+            QFile::remove(runtimePath);
+            if (!QFile::copy(cachedPath, runtimePath)) {
+                logFromThread(QStringLiteral("[MODEL] 模型替换运行时写入失败"));
+                markRuntimeUnavailable();
+                return;
+            }
+            ready = fileMatchesSha256AndSize(runtimePath, artifact.fileSha256, artifact.fileSize);
+            if (!ready) {
+                QFile::remove(runtimePath);
+                logFromThread(QStringLiteral("[MODEL] 模型替换运行时校验失败"));
+                markRuntimeUnavailable();
+                return;
+            }
+        }
+
+        QMetaObject::invokeMethod(this, [this]() {
+            setModelRuntimeAvailable(true);
+            if (m_modelModificationEnabled) {
+                setModelReplacementStatus(QStringLiteral("等待模型资源"));
+                if (m_authSessionVerified) {
+                    startModelReplacementWait();
+                }
             }
         }, Qt::QueuedConnection);
     }).detach();

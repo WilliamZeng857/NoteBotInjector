@@ -168,6 +168,9 @@ public:
                      QString *message = nullptr);
     int getModelEntitlements(QJsonObject &data,
                              QString *message = nullptr);
+    int getModelRuntimePolicy(const QJsonObject &request,
+                              QJsonObject &data,
+                              QString *message = nullptr);
     int downloadOverlayDll(const QJsonObject &request,
                            QJsonObject &data,
                            QString *message = nullptr);

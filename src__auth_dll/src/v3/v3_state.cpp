@@ -1442,6 +1442,115 @@ int StateManager::getModelEntitlements(QJsonObject &data,
     return kRcOk;
 }
 
+int StateManager::getModelRuntimePolicy(const QJsonObject &requestJson,
+                                        QJsonObject &data,
+                                        QString *message)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (!hasVerifiedLicenseLocked()) {
+        if (message) {
+            *message = QStringLiteral("当前设备尚未完成联网激活");
+        }
+        return kRcServerRejected;
+    }
+
+    QString payloadJson;
+    QString signatureHex;
+    QString nonceHex;
+    QString timestampUtc;
+    QString error;
+    if (!makeSignedPayloadLocked(QStringLiteral("model_runtime_policy_v1"),
+                                 payloadJson,
+                                 signatureHex,
+                                 nonceHex,
+                                 timestampUtc,
+                                 &error)) {
+        m_snapshot.lastError = error;
+        if (message) {
+            *message = QStringLiteral("设备签名失败");
+        }
+        return error.startsWith(QStringLiteral("dpapi_")) ? kRcDpapiDecryptFailed
+                                                          : kRcDeviceKeyMissing;
+    }
+
+    RpcModelRuntimePolicyRequest request;
+    request.keyId = m_licenseRecord.keyId;
+    request.deviceId = m_licenseRecord.deviceId;
+    request.timestampUtc = timestampUtc;
+    request.nonceHex = nonceHex;
+    request.deviceSignatureHex = signatureHex;
+    request.currentRuntimeSha256 =
+        requestJson.value(QStringLiteral("current_runtime_sha256")).toString().trimmed().toLower();
+
+    RpcModelRuntimePolicyResponse response;
+    if (!m_rpcClient.modelRuntimePolicy(request, response, error)) {
+        m_snapshot.networkAvailable = false;
+        m_snapshot.lastError = error;
+        if (message) {
+            *message = QStringLiteral("无法连接服务器");
+        }
+        return kRcNetworkUnavailable;
+    }
+
+    const QString status = response.status.trimmed().toLower();
+    if (!response.runtimeEnabled ||
+        status == QStringLiteral("model_runtime_not_granted") ||
+        status == QStringLiteral("model_runtime_disabled") ||
+        status == QStringLiteral("not_granted")) {
+        m_snapshot.networkAvailable = true;
+        m_snapshot.lastError.clear();
+        data[QStringLiteral("runtime_enabled")] = false;
+        data[QStringLiteral("status")] = response.status;
+        if (message) {
+            *message = QStringLiteral("模型替换运行时未授权");
+        }
+        return kRcOk;
+    }
+
+    const int statusRc = classifyServerStatusLocked(response.status);
+    if (statusRc != kRcOk) {
+        m_snapshot.networkAvailable = true;
+        m_snapshot.lastError = response.status;
+        if (message) {
+            *message = statusRc == kRcDeviceKicked
+                ? QStringLiteral("已被其他设备顶下线")
+                : QStringLiteral("模型替换运行时策略被拒绝");
+        }
+        return statusRc == kRcOk ? kRcServerRejected : statusRc;
+    }
+
+    if (response.dllName.isEmpty() ||
+        response.dllSha256.isEmpty() ||
+        response.dllSize <= 0 ||
+        response.downloadUrl.isEmpty() ||
+        response.runtimeProtocol <= 0 ||
+        response.runtimeAbi <= 0) {
+        m_snapshot.networkAvailable = true;
+        m_snapshot.lastError = QStringLiteral("model_runtime_policy_invalid");
+        if (message) {
+            *message = QStringLiteral("模型替换运行时策略无效");
+        }
+        return kRcDllPolicyInvalid;
+    }
+
+    m_snapshot.networkAvailable = true;
+    m_snapshot.lastError.clear();
+    data[QStringLiteral("runtime_enabled")] = true;
+    data[QStringLiteral("dll_name")] = response.dllName;
+    data[QStringLiteral("dll_sha256")] = response.dllSha256;
+    data[QStringLiteral("dll_md5")] = response.dllMd5;
+    data[QStringLiteral("dll_size")] = response.dllSize;
+    data[QStringLiteral("download_url")] = response.downloadUrl;
+    data[QStringLiteral("channel")] = response.channel;
+    data[QStringLiteral("expires_in")] = response.expiresIn;
+    data[QStringLiteral("runtime_protocol")] = response.runtimeProtocol;
+    data[QStringLiteral("runtime_abi")] = response.runtimeAbi;
+    if (message) {
+        *message = QStringLiteral("模型替换运行时策略获取成功");
+    }
+    return kRcOk;
+}
+
 int StateManager::downloadOverlayDll(const QJsonObject &request,
                                      QJsonObject &data,
                                      QString *message)

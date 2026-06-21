@@ -151,6 +151,7 @@ private:
     void finishInitialization();
     void setAuthSessionVerified(bool verified);
     void refreshModelEntitlementsAsync();
+    void refreshModelRuntimeAsync();
     void clearModelCatalog();
     bool authActionsBlocked(QString *reason = nullptr) const;
     bool injectBlocked(QString *reason = nullptr) const;

@@ -101,6 +101,30 @@ struct RpcModelEntitlementsResponse {
     QJsonArray models;
 };
 
+struct RpcModelRuntimePolicyRequest {
+    QString keyId;
+    QString deviceId;
+    QString timestampUtc;
+    QString nonceHex;
+    QString deviceSignatureHex;
+    QString currentRuntimeSha256;
+    int protocolVersion = 3;
+};
+
+struct RpcModelRuntimePolicyResponse {
+    QString status;
+    bool runtimeEnabled = false;
+    QString dllName;
+    QString dllSha256;
+    QString dllMd5;
+    qint64 dllSize = 0;
+    QString downloadUrl;
+    QString channel;
+    int expiresIn = 0;
+    int runtimeProtocol = 1;
+    int runtimeAbi = 2;
+};
+
 struct RpcIssueTicketRequest {
     QString keyId;
     QString deviceId;
@@ -166,6 +190,9 @@ public:
     bool modelEntitlements(const RpcModelEntitlementsRequest &request,
                            RpcModelEntitlementsResponse &response,
                            QString &error) const;
+    bool modelRuntimePolicy(const RpcModelRuntimePolicyRequest &request,
+                            RpcModelRuntimePolicyResponse &response,
+                            QString &error) const;
     bool issueInjectTicket(const RpcIssueTicketRequest &request,
                            RpcIssueTicketResponse &response,
                            QString &error) const;

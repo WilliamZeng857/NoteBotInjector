@@ -244,6 +244,13 @@ QJsonObject dispatchAction(StateManager &state, const QString &action, const QJs
         return makeResp(rc == kRcOk, act, rc, message, data, state.snapshot(), true);
     }
 
+    if (act == QStringLiteral("model_runtime_policy_v1")) {
+        QString message;
+        QJsonObject data;
+        const int rc = state.getModelRuntimePolicy(request, data, &message);
+        return makeResp(rc == kRcOk, act, rc, message, data, state.snapshot(), true);
+    }
+
     if (act == QStringLiteral("download_overlay_dll_v3")) {
         QString message;
         QJsonObject data;

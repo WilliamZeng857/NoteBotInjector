@@ -269,6 +269,61 @@ bool RpcClientV3::modelEntitlements(const RpcModelEntitlementsRequest &request,
     return true;
 }
 
+bool RpcClientV3::modelRuntimePolicy(const RpcModelRuntimePolicyRequest &request,
+                                     RpcModelRuntimePolicyResponse &response,
+                                     QString &error) const
+{
+    QByteArray json = canonicalJsonString(
+        {
+            {QStringLiteral("cmd"), QStringLiteral("model_runtime_policy_v1")},
+            {QStringLiteral("key_id"), request.keyId},
+            {QStringLiteral("device_id"), request.deviceId},
+            {QStringLiteral("timestamp_utc"), request.timestampUtc},
+            {QStringLiteral("nonce"), request.nonceHex},
+            {QStringLiteral("device_signature"), request.deviceSignatureHex},
+            {QStringLiteral("current_runtime_sha256"), request.currentRuntimeSha256},
+        },
+        {
+            {QStringLiteral("protocol_version"), request.protocolVersion},
+        }).toUtf8();
+
+    QByteArray plain = sendEncryptedJson(json, 15000, error);
+    if (plain.isEmpty()) {
+        return false;
+    }
+
+    const QJsonObject obj = parseObject(plain, error);
+    if (obj.isEmpty()) {
+        return false;
+    }
+
+    response.status = obj.value(QStringLiteral("status")).toString();
+    response.runtimeEnabled = obj.value(QStringLiteral("runtime_enabled")).toBool(false);
+    response.dllName = obj.value(QStringLiteral("dll_name"))
+                           .toString(obj.value(QStringLiteral("runtime_name")).toString())
+                           .trimmed();
+    response.dllSha256 = obj.value(QStringLiteral("dll_sha256"))
+                             .toString(obj.value(QStringLiteral("runtime_sha256")).toString())
+                             .trimmed()
+                             .toLower();
+    response.dllMd5 = obj.value(QStringLiteral("dll_md5"))
+                          .toString(obj.value(QStringLiteral("runtime_md5")).toString())
+                          .trimmed()
+                          .toLower();
+    response.dllSize = obj.value(QStringLiteral("dll_size"))
+                           .toVariant()
+                           .toLongLong();
+    if (response.dllSize <= 0) {
+        response.dllSize = obj.value(QStringLiteral("runtime_size")).toVariant().toLongLong();
+    }
+    response.downloadUrl = obj.value(QStringLiteral("download_url")).toString().trimmed();
+    response.channel = obj.value(QStringLiteral("channel")).toString().trimmed();
+    response.expiresIn = obj.value(QStringLiteral("expires_in")).toInt(0);
+    response.runtimeProtocol = obj.value(QStringLiteral("runtime_protocol")).toInt(1);
+    response.runtimeAbi = obj.value(QStringLiteral("runtime_abi")).toInt(2);
+    return true;
+}
+
 bool RpcClientV3::issueInjectTicket(const RpcIssueTicketRequest &request,
                                     RpcIssueTicketResponse &response,
                                     QString &error) const
