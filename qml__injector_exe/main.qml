@@ -1548,20 +1548,20 @@ Window {
                     Text {
                         width: parent.width
                         horizontalAlignment: Text.AlignRight
-                        text: "Maintained by Codex/GPT · Final direction by Papa"
+                        text: "由 Claude/GPT/DeepSeek 协助维护 · 最终方向由帕帕确认"
                         color: Qt.rgba(1, 1, 1, 0.22)
                         font.pixelSize: 10
-                        font.family: "Segoe UI"
+                        font.family: "Microsoft YaHei UI"
                         elide: Text.ElideRight
                     }
 
                     Text {
                         width: parent.width
                         horizontalAlignment: Text.AlignRight
-                        text: "Not affiliated with Mojang or Microsoft"
+                        text: "非 Mojang 或 Microsoft 官方产品"
                         color: Qt.rgba(1, 1, 1, 0.16)
                         font.pixelSize: 10
-                        font.family: "Segoe UI"
+                        font.family: "Microsoft YaHei UI"
                         elide: Text.ElideRight
                     }
                 }
