@@ -569,7 +569,7 @@ Backend::Backend(ProcessModel *procModel,
     m_modelReplacementStatus = m_modelModificationEnabled
         ? QStringLiteral("等待密钥验证")
         : QStringLiteral("已关闭");
-    m_initStatus = QStringLiteral("准备启动...");
+    m_initStatus = "准备启动...";
     m_initStep = 3;
     qInfo() << "Backend constructor: done";
 }
@@ -586,31 +586,31 @@ void Backend::initializeAsync()
 
     m_initializing = true;
     emit initializingChanged();
-    setInitStatus(QStringLiteral("准备检查更新..."), 5);
+    setInitStatus("准备检查更新...", 5);
     // 让 QML 先完成首帧渲染，再开始可能较慢的网络检查。
     QTimer::singleShot(60, this, [this]() {
-        setInitStatus(QStringLiteral("检查 DLL 更新..."), 15);
+        setInitStatus("检查 DLL 更新...", 15);
         checkDllUpdateAsync();
     });
 }
 
 void Backend::finishInitialization()
 {
-    setInitStatus(QStringLiteral("加载授权模块..."), 55);
+    setInitStatus("加载授权模块...", 55);
 
     if (m_funcs) {
         unloadAuthDll();
     }
 
     if (!loadAuthDll()) {
-        setInitStatus(QStringLiteral("授权模块加载失败"), 0);
+        setInitStatus("授权模块加载失败", 0);
         m_initializing = false;
         emit initializingChanged();
-        emit initializationFailed(QStringLiteral("未找到 NoteBotAuth.dll，程序无法运行"));
+        emit initializationFailed("未找到 NoteBotAuth.dll，程序无法运行");
         return;
     }
 
-    setInitStatus(QStringLiteral("读取本地状态..."), 60);
+    setInitStatus("读取本地状态...", 60);
     syncHostUpdateSnapshot(m_hostUpdateState, false);
     syncStatusFromDll();
     emit licenseStatusChanged();
@@ -633,7 +633,7 @@ void Backend::finishInitialization()
         });
     }
 
-    setInitStatus(QStringLiteral("就绪"), 100);
+    setInitStatus("就绪", 100);
     m_downloadProgress = -1;
     emit downloadProgressChanged();
     m_initializing = false;
@@ -1738,7 +1738,7 @@ void Backend::checkDllUpdateAsync()
 
 void Backend::checkDllUpdateAsyncInternal()
 {
-    logFromThread(QStringLiteral("[UPD] 正在检查 NoteBotAuth.dll 更新..."));
+    logFromThread("[UPD] 正在检查 NoteBotAuth.dll 更新...");
 
     Updater updater;
     updater.setLogCallback([this](const QString &msg) { logFromThread(msg); });
@@ -1840,7 +1840,7 @@ void Backend::checkDllUpdateAsyncInternal()
 
     m_authUpdateRequired = false;
     if (!info.updaterExe.fileName.isEmpty()) {
-        logFromThread(QStringLiteral("[UPD] 检测到更新器更新项"));
+        logFromThread("[UPD] 检测到更新器更新项");
         const QString installedUpdater = installedUpdaterPath();
         const QString updaterCachePath = QDir(localDir).absoluteFilePath(
             QStringLiteral("updates/updater/%1-%2-%3.bin")
@@ -1849,10 +1849,10 @@ void Backend::checkDllUpdateAsyncInternal()
                      info.updaterExe.fileSha256.isEmpty() ? QStringLiteral("nosha")
                                                           : info.updaterExe.fileSha256.left(12)));
         if (fileMatchesArtifact(installedUpdater, info.updaterExe)) {
-            logFromThread(QStringLiteral("[UPD] updater.exe 已匹配清单版本"));
+            logFromThread("[UPD] updater.exe 已匹配清单版本");
             downloadedUpdaterPath = installedUpdater;
         } else if (fileMatchesArtifact(updaterCachePath, info.updaterExe)) {
-            logFromThread(QStringLiteral("[UPD] 本地缓存已有相同 updater.exe，无需重复下载"));
+            logFromThread("[UPD] 本地缓存已有相同 updater.exe，无需重复下载");
             downloadedUpdaterPath = updaterCachePath;
         } else {
             downloadedUpdaterPath = updater.downloadArtifact(info.updaterExe,
@@ -1892,7 +1892,7 @@ void Backend::checkDllUpdateAsyncInternal()
     }
 
     if (!info.mainExe.fileName.isEmpty()) {
-        logFromThread(QStringLiteral("[UPD] 检测到主程序更新项"));
+        logFromThread("[UPD] 检测到主程序更新项");
         const QString currentExePath = QCoreApplication::applicationFilePath();
         if (!fileMatchesArtifact(currentExePath, info.mainExe)) {
             QMetaObject::invokeMethod(this, [this]() {
@@ -1933,7 +1933,7 @@ void Backend::checkDllUpdateAsyncInternal()
                     }
                     logFromThread(QString("[UPD] [ERR] %1").arg(launchError));
                 } else {
-                    logFromThread(QStringLiteral("[UPD] 已拉起 updater.exe，准备替换主程序并重启"));
+                    logFromThread("[UPD] 已拉起 updater.exe，准备替换主程序并重启");
                     QMetaObject::invokeMethod(this, [this]() {
                         syncHostUpdateSnapshot(QStringLiteral("ready"), false);
                         setInitStatus(QStringLiteral("主程序更新中，准备重启..."), 100);
@@ -1945,7 +1945,7 @@ void Backend::checkDllUpdateAsyncInternal()
                 }
             }
         } else {
-            logFromThread(QStringLiteral("[UPD] 主程序已匹配清单版本"));
+            logFromThread("[UPD] 主程序已匹配清单版本");
         }
     }
 
@@ -1953,10 +1953,10 @@ void Backend::checkDllUpdateAsyncInternal()
     m_authUpdateRequired = authDllStillRequiresMandatoryUpdate(mainPath, authArtifact);
     if (authArtifact.fileName.isEmpty() || authArtifact.fileSize <= 0 ||
         (authArtifact.fileMd5.isEmpty() && authArtifact.fileSha256.isEmpty())) {
-        logFromThread(QStringLiteral("[UPD] 当前已是最新版本"));
+        logFromThread("[UPD] 当前已是最新版本");
         QMetaObject::invokeMethod(this, [this]() {
             syncHostUpdateSnapshot(QStringLiteral("idle"), false);
-            setInitStatus(QStringLiteral("当前已是最新版本"), 70);
+            setInitStatus("当前已是最新版本", 70);
             finishInitialization();
         }, Qt::QueuedConnection);
         return;
@@ -1974,29 +1974,29 @@ void Backend::checkDllUpdateAsyncInternal()
 
     if (fileMatchesArtifact(mainPath, authArtifact)) {
         m_authUpdateRequired = false;
-        logFromThread(QStringLiteral("[UPD] 主路径 Auth DLL 已是最新版本"));
+        logFromThread("[UPD] 主路径 Auth DLL 已是最新版本");
         QMetaObject::invokeMethod(this, [this]() {
             syncHostUpdateSnapshot(QStringLiteral("idle"), false);
-            setInitStatus(QStringLiteral("当前已是最新版本"), 90);
+            setInitStatus("当前已是最新版本", 90);
             finishInitialization();
         }, Qt::QueuedConnection);
         return;
     }
 
     if (fileMatchesArtifact(tempPath, authArtifact)) {
-        logFromThread(QStringLiteral("[UPD] 本地缓存已有相同 Auth DLL，无需重复下载"));
+        logFromThread("[UPD] 本地缓存已有相同 Auth DLL，无需重复下载");
         targetPath = tempPath;
     } else {
         needDownload = true;
     }
 
     if (needDownload) {
-        logFromThread(QStringLiteral("[UPD] 正在下载授权模块更新..."));
+        logFromThread("[UPD] 正在下载授权模块更新...");
         QMetaObject::invokeMethod(this, [this]() {
             m_downloadProgress = 0;
             emit downloadProgressChanged();
             syncHostUpdateSnapshot(QStringLiteral("downloading"), true);
-            setInitStatus(QStringLiteral("正在下载更新..."), 70);
+            setInitStatus("正在下载更新...", 70);
         }, Qt::QueuedConnection);
 
         QString downloadedPath = updater.downloadArtifact(authArtifact,
@@ -2005,7 +2005,7 @@ void Backend::checkDllUpdateAsyncInternal()
                                                           info.receivedAt,
                                                           makeRefreshCallback(QStringLiteral("auth_dll")));
         if (downloadedPath.isEmpty()) {
-            logFromThread(QStringLiteral("[UPD] [ERR] DLL 下载失败"));
+            logFromThread("[UPD] [ERR] DLL 下载失败");
             QString errMsg = QString("NoteBotAuth.dll 更新下载失败。\n"
                                      "可能原因：\n"
                                      "1. 网络连接问题\n"
@@ -2018,7 +2018,7 @@ void Backend::checkDllUpdateAsyncInternal()
                     reinterpret_cast<const wchar_t*>(errMsg.utf16()),
                     L"NoteBot - DLL 更新失败",
                     MB_OK | MB_ICONWARNING);
-                setInitStatus(QStringLiteral("授权模块更新失败"), 0);
+                setInitStatus("授权模块更新失败", 0);
                 m_downloadProgress = -1;
                 emit downloadProgressChanged();
                 m_initializing = false;
@@ -2032,23 +2032,23 @@ void Backend::checkDllUpdateAsyncInternal()
             authArtifact = info.authDll;
         }
         targetPath = downloadedPath;
-        logFromThread(QStringLiteral("[UPD] 授权模块下载完成"));
+        logFromThread("[UPD] 授权模块下载完成");
         QMetaObject::invokeMethod(this, [this]() {
             m_downloadProgress = 100;
             emit downloadProgressChanged();
             syncHostUpdateSnapshot(QStringLiteral("ready"), true);
-            setInitStatus(QStringLiteral("下载完成，正在同步..."), 90);
+            setInitStatus("下载完成，正在同步...", 90);
         }, Qt::QueuedConnection);
     }
 
     // 更新检查发生在 LoadLibrary 之前，主路径此时不应被本进程锁住。
     if (!targetPath.isEmpty() && targetPath != mainPath) {
         if (fileMatchesArtifact(mainPath, authArtifact)) {
-            logFromThread(QStringLiteral("[UPD] 主路径已是相同版本，无需同步"));
+            logFromThread("[UPD] 主路径已是相同版本，无需同步");
         } else {
             bool removed = !QFile::exists(mainPath) || QFile::remove(mainPath);
             if (!removed) {
-                logFromThread(QStringLiteral("[UPD] [ERR] 主路径授权模块正在被占用，无法替换"));
+                logFromThread("[UPD] [ERR] 主路径授权模块正在被占用，无法替换");
                 QString errMsg = QString("NoteBotAuth.dll 已下载成功，但主路径 DLL 正在被占用，无法替换。\n\n"
                                          "请关闭所有 NoteBot Injector 窗口后重新启动。\n\n"
                                          "当前不会继续加载旧 DLL。");
@@ -2058,7 +2058,7 @@ void Backend::checkDllUpdateAsyncInternal()
                         reinterpret_cast<const wchar_t*>(errMsg.utf16()),
                         L"NoteBot - DLL 被占用",
                         MB_OK | MB_ICONWARNING);
-                    setInitStatus(QStringLiteral("授权模块更新失败"), 0);
+                    setInitStatus("授权模块更新失败", 0);
                     m_downloadProgress = -1;
                     emit downloadProgressChanged();
                     m_initializing = false;
@@ -2070,9 +2070,9 @@ void Backend::checkDllUpdateAsyncInternal()
 
             if (QFile::copy(targetPath, mainPath)) {
                 m_authUpdateRequired = authDllStillRequiresMandatoryUpdate(mainPath, authArtifact);
-                logFromThread(QStringLiteral("[UPD] 新版本已准备就绪"));
+                logFromThread("[UPD] 新版本已准备就绪");
             } else {
-                logFromThread(QStringLiteral("[UPD] [ERR] 无法同步授权模块到主路径"));
+                logFromThread("[UPD] [ERR] 无法同步授权模块到主路径");
                 QString errMsg = QString("NoteBotAuth.dll 已下载成功，但无法同步到主路径。\n\n"
                                          "请关闭所有 NoteBot Injector 窗口后重新启动。\n\n"
                                          "当前不会继续加载旧 DLL。");
@@ -2082,7 +2082,7 @@ void Backend::checkDllUpdateAsyncInternal()
                         reinterpret_cast<const wchar_t*>(errMsg.utf16()),
                         L"NoteBot - DLL 同步失败",
                         MB_OK | MB_ICONWARNING);
-                    setInitStatus(QStringLiteral("授权模块更新失败"), 0);
+                    setInitStatus("授权模块更新失败", 0);
                     m_downloadProgress = -1;
                     emit downloadProgressChanged();
                     m_initializing = false;
