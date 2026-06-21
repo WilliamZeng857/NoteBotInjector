@@ -343,7 +343,7 @@ Window {
                             return Qt.rgba(1, 1, 1, 0.70)
                         }
                         font.pixelSize: 11
-                        font.family: "Consolas"
+                        font.family: "Microsoft YaHei UI"
                         wrapMode: Text.WrapAnywhere
                         lineHeight: 1.15
                     }
