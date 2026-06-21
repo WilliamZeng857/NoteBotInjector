@@ -1528,215 +1528,42 @@ Window {
                 visible: mainUI.detailPanel === "settings"
                 color: "#08080C"
 
-                Flickable {
-                    anchors.fill: parent
-                    clip: true
-                    contentWidth: settingsPageRestored.width
-                    contentHeight: aboutColumnRestored.height + 8
-                    boundsBehavior: Flickable.StopAtBounds
-                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                Column {
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.rightMargin: 4
+                    anchors.bottomMargin: 2
+                    width: Math.min(360, parent.width - 16)
+                    spacing: 4
 
-                    Column {
-                        id: aboutColumnRestored
-                        width: settingsPageRestored.width
-                        spacing: 18
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignRight
+                        text: "NoteBot Injector v3"
+                        color: Qt.rgba(1, 1, 1, 0.32)
+                        font.pixelSize: 11
+                        font.family: "Segoe UI"
+                        elide: Text.ElideRight
+                    }
 
-                        RowLayout {
-                            width: parent.width
-                            height: 132
-                            spacing: 18
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignRight
+                        text: "Maintained by Codex/GPT · Final direction by Papa"
+                        color: Qt.rgba(1, 1, 1, 0.22)
+                        font.pixelSize: 10
+                        font.family: "Segoe UI"
+                        elide: Text.ElideRight
+                    }
 
-                            Column {
-                                Layout.fillWidth: true
-                                Layout.alignment: Qt.AlignVCenter
-                                spacing: 8
-
-                                Text {
-                                    width: parent.width
-                                    text: "关于 NoteBot Injector"
-                                    color: textPrimary
-                                    font.pixelSize: 30
-                                    font.bold: true
-                                    font.family: "Microsoft YaHei UI"
-                                    elide: Text.ElideRight
-                                }
-
-                                Text {
-                                    width: Math.min(parent.width, 620)
-                                    text: "为授权用户准备的启动器与注入控制台，负责密钥验证、模块更新、进程选择、主 DLL 注入，以及启动阶段模型替换等工作流。"
-                                    color: Qt.rgba(1, 1, 1, 0.62)
-                                    font.pixelSize: 13
-                                    lineHeight: 1.32
-                                    wrapMode: Text.WordWrap
-                                    font.family: "Microsoft YaHei UI"
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.preferredWidth: 118
-                                Layout.preferredHeight: 86
-                                Layout.alignment: Qt.AlignVCenter
-                                radius: 8
-                                color: Qt.rgba(0.545, 0.361, 0.965, 0.12)
-                                border.width: 1
-                                border.color: Qt.rgba(0.545, 0.361, 0.965, 0.34)
-
-                                Column {
-                                    anchors.centerIn: parent
-                                    spacing: 4
-                                    Text {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        text: "V3"
-                                        color: "#F6F0FF"
-                                        font.pixelSize: 24
-                                        font.bold: true
-                                        font.family: "Segoe UI"
-                                    }
-                                    Text {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        text: "PLACEHOLDER"
-                                        color: textSecondary
-                                        font.pixelSize: 9
-                                        font.letterSpacing: 1.4
-                                        font.family: "Segoe UI"
-                                    }
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Qt.rgba(1, 1, 1, 0.06)
-                        }
-
-                        GridLayout {
-                            width: parent.width
-                            columns: width >= 760 ? 3 : 1
-                            columnSpacing: 12
-                            rowSpacing: 12
-
-                            Repeater {
-                                model: [
-                                    { title: "核心注入", body: "主 DLL 注入、授权校验、下载与结果回写仍然是主流程。这里后续可以放版本、通道和诊断入口。" },
-                                    { title: "模型替换", body: "启动阶段模型替换保持独立开关，只对新启动的游戏进程生效。这里后续可以放默认模型和手臂粗细选项。" },
-                                    { title: "维护声明", body: "当前项目由 Codex/GPT 代理持续维护和构建，帕帕负责最终方向、审美判断和发布取舍。" }
-                                ]
-
-                                delegate: Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 128
-                                    radius: 8
-                                    color: Qt.rgba(1, 1, 1, 0.028)
-                                    border.width: 1
-                                    border.color: Qt.rgba(1, 1, 1, 0.065)
-
-                                    Column {
-                                        anchors.fill: parent
-                                        anchors.margins: 14
-                                        spacing: 8
-                                        Text {
-                                            width: parent.width
-                                            text: modelData.title
-                                            color: textPrimary
-                                            font.pixelSize: 14
-                                            font.bold: true
-                                            font.family: "Microsoft YaHei UI"
-                                            elide: Text.ElideRight
-                                        }
-                                        Text {
-                                            width: parent.width
-                                            text: modelData.body
-                                            color: Qt.rgba(1, 1, 1, 0.58)
-                                            font.pixelSize: 11
-                                            lineHeight: 1.28
-                                            wrapMode: Text.WordWrap
-                                            font.family: "Microsoft YaHei UI"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        GridLayout {
-                            width: parent.width
-                            columns: width >= 720 ? 2 : 1
-                            columnSpacing: 12
-                            rowSpacing: 12
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 164
-                                radius: 8
-                                color: Qt.rgba(0.133, 0.827, 0.933, 0.045)
-                                border.width: 1
-                                border.color: Qt.rgba(0.133, 0.827, 0.933, 0.18)
-
-                                Column {
-                                    anchors.fill: parent
-                                    anchors.margins: 16
-                                    spacing: 10
-                                    Text {
-                                        width: parent.width
-                                        text: "占位声明"
-                                        color: accentCyan
-                                        font.pixelSize: 13
-                                        font.bold: true
-                                        font.family: "Microsoft YaHei UI"
-                                    }
-                                    Text {
-                                        width: parent.width
-                                        text: "本页面文字只是排版占位。正式版本可以写入授权范围、更新策略、隐私说明、免责声明、联系方式和问题反馈入口。"
-                                        color: Qt.rgba(1, 1, 1, 0.64)
-                                        font.pixelSize: 12
-                                        lineHeight: 1.38
-                                        wrapMode: Text.WordWrap
-                                        font.family: "Microsoft YaHei UI"
-                                    }
-                                    Text {
-                                        width: parent.width
-                                        text: "本工具不是 Mojang 或 Microsoft 官方产品。最终文案发布前需要由帕帕确认。"
-                                        color: Qt.rgba(1, 1, 1, 0.42)
-                                        font.pixelSize: 11
-                                        lineHeight: 1.32
-                                        wrapMode: Text.WordWrap
-                                        font.family: "Microsoft YaHei UI"
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: 260
-                                Layout.preferredHeight: 164
-                                radius: 8
-                                color: Qt.rgba(1, 1, 1, 0.022)
-                                border.width: 1
-                                border.color: Qt.rgba(1, 1, 1, 0.06)
-
-                                Column {
-                                    anchors.fill: parent
-                                    anchors.margins: 16
-                                    spacing: 10
-                                    Text {
-                                        width: parent.width
-                                        text: "构建信息"
-                                        color: textPrimary
-                                        font.pixelSize: 13
-                                        font.bold: true
-                                        font.family: "Microsoft YaHei UI"
-                                    }
-                                    Text {
-                                        width: parent.width
-                                        text: "界面版本    Injector v3\n维护方式    Codex/GPT\n仓库状态    GitHub 同步\n文案状态    待最终确认"
-                                        color: Qt.rgba(1, 1, 1, 0.56)
-                                        font.pixelSize: 11
-                                        lineHeight: 1.5
-                                        font.family: "Consolas"
-                                    }
-                                }
-                            }
-                        }
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignRight
+                        text: "Not affiliated with Mojang or Microsoft"
+                        color: Qt.rgba(1, 1, 1, 0.16)
+                        font.pixelSize: 10
+                        font.family: "Segoe UI"
+                        elide: Text.ElideRight
                     }
                 }
             }
