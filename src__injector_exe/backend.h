@@ -33,6 +33,8 @@ class Backend : public QObject
     Q_PROPERTY(int injectProgress READ injectProgress NOTIFY injectProgressChanged)
     Q_PROPERTY(QString injectStageText READ injectStageText NOTIFY injectStageTextChanged)
     Q_PROPERTY(bool modelModificationEnabled READ modelModificationEnabled WRITE setModelModificationEnabled NOTIFY modelModificationEnabledChanged)
+    Q_PROPERTY(bool modelArmOverrideEnabled READ modelArmOverrideEnabled WRITE setModelArmOverrideEnabled NOTIFY modelArmOverrideEnabledChanged)
+    Q_PROPERTY(QString modelArmSize READ modelArmSize WRITE setModelArmSize NOTIFY modelArmSizeChanged)
     Q_PROPERTY(bool modelRuntimeAvailable READ modelRuntimeAvailable NOTIFY modelRuntimeAvailableChanged)
     Q_PROPERTY(bool modelReplacementRunning READ modelReplacementRunning NOTIFY modelReplacementRunningChanged)
     Q_PROPERTY(QString modelReplacementStatus READ modelReplacementStatus NOTIFY modelReplacementStatusChanged)
@@ -62,10 +64,14 @@ public:
     int injectProgress() const { return m_injectProgress; }
     QString injectStageText() const { return m_injectStageText; }
     bool modelModificationEnabled() const { return m_modelModificationEnabled; }
+    bool modelArmOverrideEnabled() const { return m_modelArmOverrideEnabled; }
+    QString modelArmSize() const { return m_modelArmSize; }
     bool modelRuntimeAvailable() const { return m_modelRuntimeAvailable; }
     bool modelReplacementRunning() const { return m_modelReplacementRunning; }
     QString modelReplacementStatus() const { return m_modelReplacementStatus; }
     void setModelModificationEnabled(bool enabled);
+    void setModelArmOverrideEnabled(bool enabled);
+    void setModelArmSize(const QString &size);
     bool initializing() const { return m_initializing; }
     int initStep() const { return m_initStep; }
     QString initStatus() const { return m_initStatus; }
@@ -102,6 +108,8 @@ signals:
     void injectProgressChanged();
     void injectStageTextChanged();
     void modelModificationEnabledChanged();
+    void modelArmOverrideEnabledChanged();
+    void modelArmSizeChanged();
     void modelRuntimeAvailableChanged();
     void modelReplacementRunningChanged();
     void modelReplacementStatusChanged();
@@ -145,6 +153,8 @@ private:
     void setModelRuntimeAvailable(bool available);
     void setModelReplacementStatus(const QString &status);
     void requestModelReplacementRestart();
+    bool modelRuntimeRequested() const;
+    QString effectiveModelArmSize() const;
     void disableModelRuntimeAndRemoveLocal(const QString &status, bool removeLocalDll);
     void syncStatusFromDll();
     void syncHostUpdateSnapshot(const QString &state, bool authDllPendingReplace = false);
@@ -190,6 +200,8 @@ private:
     QString m_injectStageText;
     bool m_injectRunning = false;
     bool m_modelModificationEnabled = false;
+    bool m_modelArmOverrideEnabled = false;
+    QString m_modelArmSize = "slim";
     bool m_modelRuntimeAvailable = false;
     bool m_modelReplacementRunning = false;
     bool m_modelReplacementRestartPending = false;

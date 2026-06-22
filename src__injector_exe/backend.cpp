@@ -233,6 +233,21 @@ static QString activeModelSettingKey(const QString &licenseKey)
         : QStringLiteral("activeModelId/%1").arg(keyId);
 }
 
+static QString normalizeModelArmSize(const QString &value)
+{
+    const QString normalized = value.trimmed().toLower();
+    return normalized == QStringLiteral("wide")
+        ? QStringLiteral("wide")
+        : QStringLiteral("slim");
+}
+
+static QString modelArmSizeLabel(const QString &value)
+{
+    return normalizeModelArmSize(value) == QStringLiteral("wide")
+        ? QStringLiteral("Steve")
+        : QStringLiteral("Alex");
+}
+
 static QString modelAssetCachePath(const QString &modelId,
                                    const QString &kind,
                                    const QString &sha256,
@@ -566,7 +581,9 @@ Backend::Backend(ProcessModel *procModel,
     QSettings settings("NoteBot", "Injector");
     m_licenseKey = settings.value("licenseKey").toString();
     m_modelModificationEnabled = settings.value(QStringLiteral("modelModificationEnabled"), false).toBool();
-    m_modelReplacementStatus = m_modelModificationEnabled
+    m_modelArmOverrideEnabled = settings.value(QStringLiteral("modelArmOverrideEnabled"), false).toBool();
+    m_modelArmSize = normalizeModelArmSize(settings.value(QStringLiteral("modelArmSize"), QStringLiteral("slim")).toString());
+    m_modelReplacementStatus = modelRuntimeRequested()
         ? QStringLiteral("等待密钥验证")
         : QStringLiteral("已关闭");
     m_initStatus = "准备启动...";
@@ -761,8 +778,13 @@ void Backend::setModelModificationEnabled(bool enabled)
     emit modelModificationEnabledChanged();
 
     if (!enabled) {
-        stopModelReplacementWait();
-        setModelReplacementStatus(QStringLiteral("已关闭"));
+        if (modelRuntimeRequested()) {
+            requestModelReplacementRestart();
+            setModelReplacementStatus(QStringLiteral("正在运行"));
+        } else {
+            stopModelReplacementWait();
+            setModelReplacementStatus(QStringLiteral("已关闭"));
+        }
         m_logModel->append(QStringLiteral("[MODEL] 启动阶段模型替换已关闭"));
     } else {
         setModelReplacementStatus(m_authSessionVerified
@@ -777,6 +799,58 @@ void Backend::setModelModificationEnabled(bool enabled)
     }
 }
 
+void Backend::setModelArmOverrideEnabled(bool enabled)
+{
+    if (enabled && !m_modelRuntimeAvailable) {
+        setModelReplacementStatus(QStringLiteral("不可用"));
+        m_logModel->append(QStringLiteral("[MODEL] 手臂固定需要模型运行时授权"));
+        return;
+    }
+    if (m_modelArmOverrideEnabled == enabled) {
+        return;
+    }
+    m_modelArmOverrideEnabled = enabled;
+    QSettings settings(QStringLiteral("NoteBot"), QStringLiteral("Injector"));
+    settings.setValue(QStringLiteral("modelArmOverrideEnabled"), enabled);
+    emit modelArmOverrideEnabledChanged();
+
+    if (enabled) {
+        m_logModel->append(QStringLiteral("[MODEL] 手臂固定已启用：%1")
+                               .arg(modelArmSizeLabel(m_modelArmSize)));
+        if (m_authSessionVerified) {
+            requestModelReplacementRestart();
+        } else {
+            setModelReplacementStatus(QStringLiteral("等待密钥验证"));
+        }
+    } else {
+        m_logModel->append(QStringLiteral("[MODEL] 手臂固定已关闭"));
+        if (modelRuntimeRequested()) {
+            requestModelReplacementRestart();
+        } else {
+            stopModelReplacementWait();
+            setModelReplacementStatus(QStringLiteral("已关闭"));
+        }
+    }
+}
+
+void Backend::setModelArmSize(const QString &size)
+{
+    const QString normalized = normalizeModelArmSize(size);
+    if (m_modelArmSize == normalized) {
+        return;
+    }
+    m_modelArmSize = normalized;
+    QSettings settings(QStringLiteral("NoteBot"), QStringLiteral("Injector"));
+    settings.setValue(QStringLiteral("modelArmSize"), normalized);
+    emit modelArmSizeChanged();
+
+    if (m_modelArmOverrideEnabled) {
+        m_logModel->append(QStringLiteral("[MODEL] 手臂固定切换为：%1")
+                               .arg(modelArmSizeLabel(m_modelArmSize)));
+        requestModelReplacementRestart();
+    }
+}
+
 void Backend::startModelReplacementWait()
 {
     if (!m_modelRuntimeAvailable) {
@@ -788,8 +862,8 @@ void Backend::startModelReplacementWait()
         setModelReplacementStatus(QStringLiteral("不可用"));
         return;
     }
-    if (!m_modelModificationEnabled) {
-        m_logModel->append(QStringLiteral("[MODEL] 启动阶段模型替换已关闭"));
+    if (!modelRuntimeRequested()) {
+        m_logModel->append(QStringLiteral("[MODEL] 模型运行时已关闭"));
         setModelReplacementStatus(QStringLiteral("已关闭"));
         return;
     }
@@ -802,36 +876,42 @@ void Backend::startModelReplacementWait()
         m_logModel->append(QStringLiteral("[MODEL] 当前已经在等待下次启动"));
         return;
     }
-    if (!m_modelCatalogModel) {
-        m_logModel->append(QStringLiteral("[MODEL] 模型列表不可用"));
-        setModelReplacementStatus(QStringLiteral("失败"));
-        return;
-    }
     ModelCatalogEntry active;
-    if (!m_modelCatalogModel->activeEntry(&active)) {
-        m_logModel->append(QStringLiteral("[MODEL] 请选择一个已拥有的模型，总闸保持开启后会自动等待"));
-        setModelReplacementStatus(QStringLiteral("等待选择模型"));
-        return;
-    }
-    if (active.modelFile.isEmpty() || active.textureFile.isEmpty() ||
-        !QFile::exists(active.modelFile) || !QFile::exists(active.textureFile)) {
-        m_logModel->append(QStringLiteral("[MODEL] 当前模型资源缺失，请重新检查密钥或刷新模型列表"));
-        setModelReplacementStatus(QStringLiteral("等待模型资源"));
-        return;
+    if (m_modelModificationEnabled) {
+        if (!m_modelCatalogModel) {
+            m_logModel->append(QStringLiteral("[MODEL] 模型列表不可用"));
+            setModelReplacementStatus(QStringLiteral("失败"));
+            return;
+        }
+        if (!m_modelCatalogModel->activeEntry(&active)) {
+            m_logModel->append(QStringLiteral("[MODEL] 请选择一个已拥有的模型，总闸保持开启后会自动等待"));
+            setModelReplacementStatus(QStringLiteral("等待选择模型"));
+            return;
+        }
+        if (active.modelFile.isEmpty() || active.textureFile.isEmpty() ||
+            !QFile::exists(active.modelFile) || !QFile::exists(active.textureFile)) {
+            m_logModel->append(QStringLiteral("[MODEL] 当前模型资源缺失，请重新检查密钥或刷新模型列表"));
+            setModelReplacementStatus(QStringLiteral("等待模型资源"));
+            return;
+        }
     }
     if (!loadModelDll()) {
         return;
     }
 
     QJsonObject cfg;
-    cfg[QStringLiteral("geometry_path")] = active.modelFile;
-    cfg[QStringLiteral("texture_path")] = active.textureFile;
-    cfg[QStringLiteral("skin_id")] =
-        QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
-    cfg[QStringLiteral("arm_size")] = QStringLiteral("slim");
-    cfg[QStringLiteral("trusted")] = true;
-    cfg[QStringLiteral("premium")] = true;
-    cfg[QStringLiteral("persona")] = true;
+    cfg[QStringLiteral("model_enabled")] = m_modelModificationEnabled;
+    cfg[QStringLiteral("arm_override_enabled")] = m_modelArmOverrideEnabled;
+    cfg[QStringLiteral("arm_size")] = effectiveModelArmSize();
+    if (m_modelModificationEnabled) {
+        cfg[QStringLiteral("geometry_path")] = active.modelFile;
+        cfg[QStringLiteral("texture_path")] = active.textureFile;
+        cfg[QStringLiteral("skin_id")] =
+            QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
+        cfg[QStringLiteral("trusted")] = true;
+        cfg[QStringLiteral("premium")] = true;
+        cfg[QStringLiteral("persona")] = true;
+    }
     cfg[QStringLiteral("process_timeout_ms")] = 86400 * 1000;
     cfg[QStringLiteral("hook_timeout_ms")] = 90000;
     cfg[QStringLiteral("hit_timeout_ms")] = 45000;
@@ -842,7 +922,10 @@ void Backend::startModelReplacementWait()
         m_modelReplacementRestartPending = false;
         setModelReplacementRunning(true);
         setModelReplacementStatus(QStringLiteral("正在运行"));
-        m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(active.name));
+        const QString targetLabel = m_modelModificationEnabled
+            ? active.name
+            : QStringLiteral("Arm Lock %1").arg(modelArmSizeLabel(m_modelArmSize));
+        m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(targetLabel));
     } else if (rc == 2) {
         setModelReplacementRunning(true);
         m_logModel->append(QStringLiteral("[MODEL] 当前已经在等待下次启动"));
@@ -862,7 +945,7 @@ void Backend::stopModelReplacementWait()
     if (m_modelReplacementRunning) {
         setModelReplacementStatus(QStringLiteral("停止中"));
         m_logModel->append(QStringLiteral("[MODEL] 已请求停止等待"));
-    } else if (m_modelModificationEnabled) {
+    } else if (modelRuntimeRequested()) {
         setModelReplacementStatus(m_authSessionVerified
             ? QStringLiteral("等待选择模型")
             : QStringLiteral("等待密钥验证"));
@@ -1026,7 +1109,7 @@ void Backend::refreshModelEntitlementsAsync()
                 m_logModel->append(QStringLiteral("[MODEL] 模型列表已刷新：%1 个")
                                        .arg(entries.size()));
             }
-            if (m_modelModificationEnabled && m_modelRuntimeAvailable) {
+            if (modelRuntimeRequested() && m_modelRuntimeAvailable) {
                 startModelReplacementWait();
             }
         }, Qt::QueuedConnection);
@@ -1133,8 +1216,10 @@ void Backend::refreshModelRuntimeAsync()
 
         QMetaObject::invokeMethod(this, [this]() {
             setModelRuntimeAvailable(true);
-            if (m_modelModificationEnabled) {
-                setModelReplacementStatus(QStringLiteral("等待模型资源"));
+            if (modelRuntimeRequested()) {
+                setModelReplacementStatus(m_modelModificationEnabled
+                    ? QStringLiteral("等待模型资源")
+                    : QStringLiteral("等待密钥验证"));
                 if (m_authSessionVerified) {
                     startModelReplacementWait();
                 }
@@ -1351,7 +1436,7 @@ void Backend::unloadModelDll()
 
 void Backend::requestModelReplacementRestart()
 {
-    if (!m_modelModificationEnabled || !m_authSessionVerified) {
+    if (!modelRuntimeRequested() || !m_authSessionVerified) {
         return;
     }
     if (!m_modelReplacementRunning) {
@@ -1381,8 +1466,14 @@ void Backend::disableModelRuntimeAndRemoveLocal(const QString &status, bool remo
     if (m_modelFuncs) {
         unloadModelDll();
     }
+    if (m_modelArmOverrideEnabled) {
+        m_modelArmOverrideEnabled = false;
+        QSettings settings(QStringLiteral("NoteBot"), QStringLiteral("Injector"));
+        settings.setValue(QStringLiteral("modelArmOverrideEnabled"), false);
+        emit modelArmOverrideEnabledChanged();
+    }
     setModelRuntimeAvailable(false);
-    if (m_modelModificationEnabled) {
+    if (modelRuntimeRequested()) {
         setModelReplacementStatus(status);
     } else {
         setModelReplacementStatus(QStringLiteral("已关闭"));
@@ -1430,17 +1521,29 @@ void Backend::setModelReplacementStatus(const QString &status)
     emit modelReplacementStatusChanged();
 }
 
+bool Backend::modelRuntimeRequested() const
+{
+    return m_modelModificationEnabled || m_modelArmOverrideEnabled;
+}
+
+QString Backend::effectiveModelArmSize() const
+{
+    return m_modelArmOverrideEnabled
+        ? normalizeModelArmSize(m_modelArmSize)
+        : QStringLiteral("slim");
+}
+
 void Backend::handleModelDllState(const QString &key, const QString &value)
 {
     if (key == QStringLiteral("model_running")) {
         setModelReplacementRunning(value == QStringLiteral("true"));
         if (value != QStringLiteral("true") && m_modelReplacementRestartPending &&
-            m_modelModificationEnabled && m_authSessionVerified) {
+            modelRuntimeRequested() && m_authSessionVerified) {
             m_modelReplacementRestartPending = false;
             QTimer::singleShot(0, this, [this]() {
                 startModelReplacementWait();
             });
-        } else if (value != QStringLiteral("true") && m_modelModificationEnabled &&
+        } else if (value != QStringLiteral("true") && modelRuntimeRequested() &&
             m_modelReplacementStatus == QStringLiteral("已停止")) {
             setModelReplacementStatus(QStringLiteral("等待密钥验证"));
         }

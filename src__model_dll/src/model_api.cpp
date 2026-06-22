@@ -646,6 +646,8 @@ std::pair<bool, QString> hookBytesCompatible(quint64 addr,
 
 struct PayloadConfig {
     QString targetProcess = QStringLiteral("Minecraft.Windows.exe");
+    bool modelEnabled = true;
+    bool armOverrideEnabled = false;
     QString skinId = QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
     QString geometryPath;
     QString texturePath;
@@ -665,6 +667,14 @@ struct PayloadConfig {
     int hitTimeoutMs = 45000;
     QByteArray skinRgba;
 };
+
+QString normalizeArmSize(const QString &value)
+{
+    const QString normalized = value.trimmed().toLower();
+    return normalized == QStringLiteral("wide")
+        ? QStringLiteral("wide")
+        : QStringLiteral("slim");
+}
 
 bool readTextFile(const QString &path, QString *out, QString *error)
 {
@@ -756,18 +766,39 @@ std::optional<PayloadConfig> parseConfig(const char *json, QString *error)
     }
     const QJsonObject obj = doc.object();
     PayloadConfig cfg;
+    cfg.modelEnabled = obj.value(QStringLiteral("model_enabled")).toBool(true);
+    cfg.armOverrideEnabled = obj.value(QStringLiteral("arm_override_enabled")).toBool(false);
     cfg.skinId = obj.value(QStringLiteral("skin_id")).toString(cfg.skinId).trimmed();
     cfg.geometryPath = obj.value(QStringLiteral("geometry_path")).toString().trimmed();
     cfg.texturePath = obj.value(QStringLiteral("texture_path")).toString().trimmed();
     cfg.resourcePatch = obj.value(QStringLiteral("resource_patch")).toString().trimmed();
     cfg.geometryEngineVersion = obj.value(QStringLiteral("geometry_engine_version")).toString(cfg.geometryEngineVersion).trimmed();
-    cfg.armSize = obj.value(QStringLiteral("arm_size")).toString(cfg.armSize).trimmed();
+    cfg.armSize = normalizeArmSize(obj.value(QStringLiteral("arm_size")).toString(cfg.armSize));
     cfg.trustedValue = obj.value(QStringLiteral("trusted_raw")).toInt(obj.value(QStringLiteral("trusted")).toBool(true) ? 1 : 0);
     cfg.premiumValue = obj.value(QStringLiteral("premium")).toBool(true) ? 1 : 0;
     cfg.personaValue = obj.value(QStringLiteral("persona")).toBool(true) ? 1 : 0;
     cfg.processTimeoutMs = obj.value(QStringLiteral("process_timeout_ms")).toInt(cfg.processTimeoutMs);
     cfg.hookTimeoutMs = obj.value(QStringLiteral("hook_timeout_ms")).toInt(cfg.hookTimeoutMs);
     cfg.hitTimeoutMs = obj.value(QStringLiteral("hit_timeout_ms")).toInt(cfg.hitTimeoutMs);
+    if (!cfg.modelEnabled && !cfg.armOverrideEnabled) {
+        if (error) {
+            *error = QStringLiteral("model runtime feature disabled");
+        }
+        return std::nullopt;
+    }
+    if (!cfg.modelEnabled) {
+        cfg.skinId.clear();
+        cfg.geometryPath.clear();
+        cfg.texturePath.clear();
+        cfg.resourcePatch.clear();
+        cfg.geometryData.clear();
+        cfg.geometryEngineVersion.clear();
+        cfg.animationData.clear();
+        cfg.skinWidth = 0;
+        cfg.skinHeight = 0;
+        cfg.skinRgba.clear();
+        return cfg;
+    }
     if (cfg.geometryPath.isEmpty() || cfg.texturePath.isEmpty()) {
         if (error) {
             *error = QStringLiteral("缺少 geometry_path 或 texture_path");
@@ -800,31 +831,32 @@ std::vector<HookDef> selectedHooks(const PayloadConfig &cfg)
         bool include = true;
         switch (hook.kind) {
         case HookKind::SkinId:
-            include = !cfg.skinId.isEmpty();
+            include = cfg.modelEnabled && !cfg.skinId.isEmpty();
             break;
         case HookKind::SkinData:
-            include = !cfg.skinRgba.isEmpty();
+            include = cfg.modelEnabled && !cfg.skinRgba.isEmpty();
             break;
         case HookKind::UInt32:
             hook.value = hook.arg == QStringLiteral("skin_width") ? cfg.skinWidth : cfg.skinHeight;
-            include = hook.value > 0;
+            include = cfg.modelEnabled && hook.value > 0;
             break;
         case HookKind::ResourcePatch:
-            include = !cfg.resourcePatch.isEmpty();
+            include = cfg.modelEnabled && !cfg.resourcePatch.isEmpty();
             break;
         case HookKind::GeometryData:
-            include = !cfg.geometryData.isEmpty();
+            include = cfg.modelEnabled && !cfg.geometryData.isEmpty();
             break;
         case HookKind::GeometryEngineVersion:
-            include = !cfg.geometryEngineVersion.isEmpty();
+            include = cfg.modelEnabled && !cfg.geometryEngineVersion.isEmpty();
             break;
         case HookKind::AnimationData:
-            include = !cfg.animationData.isEmpty();
+            include = cfg.modelEnabled && !cfg.animationData.isEmpty();
             break;
         case HookKind::ArmSize:
-            include = !cfg.armSize.isEmpty();
+            include = (cfg.modelEnabled || cfg.armOverrideEnabled) && !cfg.armSize.isEmpty();
             break;
         case HookKind::Bool:
+            include = cfg.modelEnabled;
             if (hook.name == QStringLiteral("force_trusted_true")) {
                 hook.value = cfg.trustedValue;
                 hook.name = hook.value ? QStringLiteral("force_trusted_true") : QStringLiteral("force_trusted_false");
@@ -1225,6 +1257,9 @@ bool prepareRemotePayload(HANDLE process, const PayloadConfig &cfg, RemotePayloa
         !makeText(QStringLiteral("SkinAnimationData"), cfg.animationData, &remote->animationData) ||
         !makeText(QStringLiteral("ArmSize"), cfg.armSize, &remote->armSize)) {
         return false;
+    }
+    if (!cfg.modelEnabled) {
+        return true;
     }
     const auto skinObj = makeRemoteStdStringBytes(process, cfg.skinRgba);
     if (!skinObj) {

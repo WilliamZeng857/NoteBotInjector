@@ -1526,6 +1526,161 @@ Window {
                 visible: mainUI.detailPanel === "settings"
 
                 Column {
+                    visible: backend.modelRuntimeAvailable
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.leftMargin: 8
+                    anchors.topMargin: 8
+                    width: Math.min(420, parent.width - 24)
+                    spacing: 12
+
+                    Column {
+                        width: parent.width
+                        spacing: 4
+
+                        Text {
+                            width: parent.width
+                            text: "Arm Lock"
+                            color: textPrimary
+                            font.pixelSize: 18
+                            font.bold: true
+                            font.family: "Segoe UI"
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: "启动阶段固定 Steve / Alex 手臂类型"
+                            color: textSecondary
+                            font.pixelSize: 11
+                            font.family: "Microsoft YaHei UI"
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        id: armLockToggle
+                        width: parent.width
+                        height: 48
+                        radius: 8
+                        color: armLockTap.pressed
+                               ? (backend.modelArmOverrideEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : Qt.rgba(1, 1, 1, 0.085))
+                               : backend.modelArmOverrideEnabled
+                                 ? (armLockHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055))
+                                 : (armLockHover.hovered ? Qt.rgba(1, 1, 1, 0.062) : Qt.rgba(1, 1, 1, 0.025))
+                        border.width: 1
+                        border.color: backend.modelArmOverrideEnabled
+                                      ? (armLockHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.58) : Qt.rgba(0.133, 0.827, 0.933, 0.34))
+                                      : (armLockHover.hovered ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.07))
+                        scale: armLockTap.pressed ? 0.985 : armLockHover.hovered ? 1.008 : 1
+                        Behavior on color { ColorAnimation { duration: 130 } }
+                        Behavior on border.color { ColorAnimation { duration: 130 } }
+                        Behavior on scale { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
+
+                        HoverHandler { id: armLockHover }
+                        TapHandler {
+                            id: armLockTap
+                            onTapped: backend.modelArmOverrideEnabled = !backend.modelArmOverrideEnabled
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 12
+                            spacing: 10
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "固定手臂类型"
+                                    color: backend.modelArmOverrideEnabled ? textPrimary : textSecondary
+                                    font.pixelSize: 13
+                                    font.bold: true
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: backend.modelArmOverrideEnabled ? "On · 对新启动的游戏进程生效" : "Off · 保持游戏默认"
+                                    color: backend.modelArmOverrideEnabled ? accentCyan : textMuted
+                                    font.pixelSize: 10
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            Text {
+                                Layout.preferredWidth: 44
+                                text: backend.modelArmOverrideEnabled ? "ON" : "OFF"
+                                color: backend.modelArmOverrideEnabled ? accentCyan : textMuted
+                                font.pixelSize: 11
+                                font.bold: true
+                                font.family: "Segoe UI"
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        height: 42
+                        spacing: 8
+                        enabled: backend.modelArmOverrideEnabled
+                        opacity: enabled ? 1.0 : 0.45
+
+                        Rectangle {
+                            width: (parent.width - parent.spacing) / 2
+                            height: parent.height
+                            radius: 8
+                            property bool selected: backend.modelArmSize === "slim"
+                            color: selected ? Qt.rgba(0.545, 0.361, 0.965, 0.16) : Qt.rgba(1, 1, 1, 0.025)
+                            border.width: 1
+                            border.color: selected ? Qt.rgba(0.545, 0.361, 0.965, 0.56) : Qt.rgba(1, 1, 1, 0.08)
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Alex · 细手臂"
+                                color: parent.selected ? "#DDD6FE" : textSecondary
+                                font.pixelSize: 12
+                                font.bold: true
+                                font.family: "Microsoft YaHei UI"
+                            }
+
+                            TapHandler { onTapped: backend.modelArmSize = "slim" }
+                        }
+
+                        Rectangle {
+                            width: (parent.width - parent.spacing) / 2
+                            height: parent.height
+                            radius: 8
+                            property bool selected: backend.modelArmSize === "wide"
+                            color: selected ? Qt.rgba(0.133, 0.827, 0.933, 0.15) : Qt.rgba(1, 1, 1, 0.025)
+                            border.width: 1
+                            border.color: selected ? Qt.rgba(0.133, 0.827, 0.933, 0.52) : Qt.rgba(1, 1, 1, 0.08)
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Steve · 粗手臂"
+                                color: parent.selected ? "#CFFAFE" : textSecondary
+                                font.pixelSize: 12
+                                font.bold: true
+                                font.family: "Microsoft YaHei UI"
+                            }
+
+                            TapHandler { onTapped: backend.modelArmSize = "wide" }
+                        }
+                    }
+                }
+
+                Column {
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     anchors.rightMargin: 4
