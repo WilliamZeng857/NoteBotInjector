@@ -1,8 +1,8 @@
 #include <winver.h>
 
 1 VERSIONINFO
-FILEVERSION 3,5,50,0
-PRODUCTVERSION 3,5,50,0
+FILEVERSION 3,5,51,0
+PRODUCTVERSION 3,5,51,0
 FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
 FILEFLAGS VS_FF_DEBUG
@@ -19,11 +19,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "NoteBot\0"
             VALUE "FileDescription", "NoteBot Auth DLL\0"
-            VALUE "FileVersion", "3.5.50.0\0"
+            VALUE "FileVersion", "3.5.51.0\0"
             VALUE "InternalName", "NoteBotAuth.dll\0"
             VALUE "OriginalFilename", "NoteBotAuth.dll\0"
             VALUE "ProductName", "NoteBot Auth DLL\0"
-            VALUE "ProductVersion", "3.5.50.0\0"
+            VALUE "ProductVersion", "3.5.51.0\0"
         END
     END
     BLOCK "VarFileInfo"

@@ -35,8 +35,8 @@ namespace {
 
 constexpr int kProtocolVersion = 3;
 constexpr int kAbiVersion = 1;
-constexpr char kAuthDllVersion[] = "3.5.50";
-constexpr int kAuthDllVersionCode = 30550;
+constexpr char kAuthDllVersion[] = "3.5.51";
+constexpr int kAuthDllVersionCode = 30551;
 constexpr char kMainExeVersion[] = "3.5.98";
 constexpr int kMainExeVersionCode = 30598;
 constexpr char kUpdaterExeVersion[] = "3.5.71";
@@ -571,7 +571,7 @@ bool dpapiUnprotectMachine(const QByteArray &ciphertext, QByteArray &plaintext, 
 
 QString fixedClientVersion()
 {
-    return QStringLiteral("3.5.50");
+    return QStringLiteral("3.5.51");
 }
 
 QString signatureToHex(const ::NBAuth::FixedSig256 &signature)
@@ -1503,6 +1503,30 @@ int StateManager::getModelRuntimePolicy(const QJsonObject &requestJson,
         data[QStringLiteral("status")] = response.status;
         if (message) {
             *message = QStringLiteral("模型替换运行时未授权");
+        }
+        return kRcOk;
+    }
+
+    if (status == QStringLiteral("not_modified")) {
+        if (response.dllSha256.isEmpty()) {
+            m_snapshot.networkAvailable = true;
+            m_snapshot.lastError = QStringLiteral("model_runtime_policy_invalid");
+            if (message) {
+                *message = QStringLiteral("模型替换运行时策略无效");
+            }
+            return kRcDllPolicyInvalid;
+        }
+
+        m_snapshot.networkAvailable = true;
+        m_snapshot.lastError.clear();
+        data[QStringLiteral("runtime_enabled")] = true;
+        data[QStringLiteral("runtime_current")] = true;
+        data[QStringLiteral("dll_sha256")] = response.dllSha256;
+        data[QStringLiteral("runtime_protocol")] = response.runtimeProtocol;
+        data[QStringLiteral("runtime_abi")] = response.runtimeAbi;
+        data[QStringLiteral("status")] = response.status;
+        if (message) {
+            *message = QStringLiteral("模型替换运行时已是最新");
         }
         return kRcOk;
     }

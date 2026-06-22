@@ -76,10 +76,10 @@ QJsonObject dispatchAction(StateManager &state, const QString &action, const QJs
     if (act == QStringLiteral("ping")) {
         QJsonObject data;
         data[QStringLiteral("pong")] = true;
-        data[QStringLiteral("version")] = QStringLiteral("3.5.50");
+        data[QStringLiteral("version")] = QStringLiteral("3.5.51");
         data[QStringLiteral("status_snapshot")] = statusSnapshotToJson(state.snapshot());
         QJsonObject resp = makeResp(true, act, kRcOk, QStringLiteral("pong"), data, state.snapshot(), true);
-        resp[QStringLiteral("version")] = QStringLiteral("3.5.50");
+        resp[QStringLiteral("version")] = QStringLiteral("3.5.51");
         return resp;
     }
 

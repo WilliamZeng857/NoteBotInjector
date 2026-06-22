@@ -18,7 +18,7 @@
 
 namespace {
 
-constexpr char kDllVersion[] = "3.5.50";
+constexpr char kDllVersion[] = "3.5.51";
 
 struct GlobalState {
     NB_LogCallback logCb = nullptr;

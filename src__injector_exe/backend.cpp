@@ -377,8 +377,8 @@ static QPair<QString, QString> summarizeModelGeometry(const QString &modelPath)
 
 static constexpr char kCurrentMainVersion[] = "3.6.76";
 static constexpr int kCurrentMainVersionCode = 30676;
-static constexpr char kCurrentAuthDllVersion[] = "3.5.50";
-static constexpr int kCurrentAuthDllVersionCode = 30550;
+static constexpr char kCurrentAuthDllVersion[] = "3.5.51";
+static constexpr int kCurrentAuthDllVersionCode = 30551;
 static constexpr char kCurrentUpdaterVersion[] = "3.5.71";
 static constexpr int kCurrentUpdaterVersionCode = 30571;
 
@@ -1176,20 +1176,29 @@ void Backend::refreshModelRuntimeAsync()
         const int expiresIn = data.value(QStringLiteral("expires_in")).toInt(0);
         const int runtimeProtocol = data.value(QStringLiteral("runtime_protocol")).toInt(1);
         const int runtimeAbi = data.value(QStringLiteral("runtime_abi")).toInt(2);
+        const bool runtimeCurrent = data.value(QStringLiteral("runtime_current")).toBool(false);
 
-        if (artifact.fileName.isEmpty() ||
-            artifact.fileSha256.isEmpty() ||
-            artifact.fileSize <= 0 ||
-            !artifact.downloadUrl.isValid() ||
+        if (artifact.fileSha256.isEmpty() ||
             runtimeProtocol != kExpectedModelProtocolVersion ||
-            runtimeAbi != kExpectedModelAbiVersion) {
+            runtimeAbi != kExpectedModelAbiVersion ||
+            (!runtimeCurrent && (artifact.fileName.isEmpty() ||
+                                 artifact.fileSize <= 0 ||
+                                 !artifact.downloadUrl.isValid()))) {
             logFromThread(QStringLiteral("[MODEL] 模型替换运行时策略无效"));
             markRuntimeUnavailable();
             return;
         }
 
-        bool ready = fileMatchesSha256AndSize(runtimePath, artifact.fileSha256, artifact.fileSize);
+        bool ready = runtimeCurrent
+            ? fileMatchesSha256AndSize(runtimePath, artifact.fileSha256, 0)
+            : fileMatchesSha256AndSize(runtimePath, artifact.fileSha256, artifact.fileSize);
         if (!ready) {
+            if (runtimeCurrent) {
+                logFromThread(QStringLiteral("[MODEL] 本地模型替换运行时缺失或校验失败"));
+                markRuntimeUnavailable();
+                return;
+            }
+
             Updater updater;
             updater.setLogCallback([this](const QString &msg) {
                 if (msg.contains(QStringLiteral("[ERR]"))) {
