@@ -555,6 +555,7 @@ std::vector<HookDef> baseHooks()
         {"force_geometry_engine_version", 0x217207c, QByteArray::fromHex("e83f497b04"), HookKind::GeometryEngineVersion, {}, 0, 0x200},
         {"force_animation_data", 0x217215b, QByteArray::fromHex("e860487b04"), HookKind::AnimationData, {}, 0, 0x200},
         {"force_arm_size", 0x21725ec, QByteArray::fromHex("e81f827b04"), HookKind::ArmSize, {}, 0, 0x200},
+        {"full_force_arm_size", 0x213d1b7, QByteArray::fromHex("e854d67e04"), HookKind::ArmSize, {}, 0, 0x200},
         {"force_trusted_true", 0x2172a8a, QByteArray::fromHex("e8510f7303"), HookKind::Bool, {}, 1, 0x200},
         {"force_premium_true", 0x2172ac7, QByteArray::fromHex("e874c87203"), HookKind::Bool, {}, 1, 0x200},
         {"force_persona_false", 0x2172b04, QByteArray::fromHex("e817c87203"), HookKind::Bool, {}, 0, 0x200},
@@ -580,6 +581,7 @@ const std::unordered_map<std::string, Locator> &hookLocators()
         {"force_geometry_engine_version", {"classic_skin", "SkinGeometryDataEngineVersion", "prev_call", 2}},
         {"force_animation_data", {"classic_skin", "SkinAnimationData", "prev_call", 2}},
         {"force_arm_size", {"classic_skin", "ArmSize", "prev_call", 1}},
+        {"full_force_arm_size", {"full_login", "ArmSize", "prev_call", 1}},
         {"force_trusted_true", {"classic_skin", "TrustedSkin", "prev_call", 1}},
         {"force_premium_true", {"classic_skin", "PremiumSkin", "prev_call", 1}},
         {"force_persona_false", {"classic_skin", "PersonaSkin", "prev_call", 1}},
@@ -602,6 +604,13 @@ const std::unordered_map<std::string, GroupRequirement> &groupRequirements()
           {"SkinId", "SkinData", "SkinImageWidth", "SkinImageHeight", "SkinResourcePatch",
            "SkinGeometryData", "SkinGeometryDataEngineVersion", "SkinAnimationData", "ArmSize",
            "PersonaPieces", "TrustedSkin", "PremiumSkin", "PersonaSkin"}}},
+        {"full_login",
+         {8,
+          0x213c54a,
+          {"Certificate", "Token", "AuthenticationType", "SelfSignedId", "PlatformUserId",
+           "SkinId", "SkinData", "SkinResources", "SkinGeometry",
+           "SkinGeometryDataEngineVersion", "SkinAnimationData", "ArmSize",
+           "TrustedSkin", "PremiumSkin", "PersonaSkin"}}},
     };
     return groups;
 }
