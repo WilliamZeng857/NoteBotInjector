@@ -853,6 +853,7 @@ void Backend::setModelArmSize(const QString &size)
 
 void Backend::startModelReplacementWait()
 {
+    std::lock_guard<std::recursive_mutex> lock(m_modelDllMutex);
     if (!m_modelRuntimeAvailable) {
         setModelReplacementStatus(QStringLiteral("不可用"));
         return;
@@ -938,8 +939,12 @@ void Backend::startModelReplacementWait()
 
 void Backend::stopModelReplacementWait()
 {
+    std::lock_guard<std::recursive_mutex> lock(m_modelDllMutex);
     m_modelReplacementRestartPending = false;
-    if (m_modelFuncs && m_modelFuncs->fn_stop_wait) {
+    if (m_modelFuncs && !m_hModelDll) {
+        m_modelFuncs = nullptr;
+    }
+    if (m_modelFuncs && m_hModelDll && m_modelFuncs->fn_stop_wait) {
         m_modelFuncs->fn_stop_wait();
     }
     if (m_modelReplacementRunning) {
@@ -1363,8 +1368,12 @@ void Backend::unloadAuthDll()
 
 bool Backend::loadModelDll()
 {
-    if (m_modelFuncs) {
+    std::lock_guard<std::recursive_mutex> lock(m_modelDllMutex);
+    if (m_modelFuncs && m_hModelDll) {
         return true;
+    }
+    if (m_modelFuncs && !m_hModelDll) {
+        m_modelFuncs = nullptr;
     }
 
     const QString dllPath = injectorModelRuntimeDllPath();
@@ -1384,10 +1393,12 @@ bool Backend::loadModelDll()
     }
 
     m_modelFuncs = new ModelDllFuncs();
+    m_hModelDll = h;
     if (!m_modelFuncs->resolve(h)) {
         m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 导出函数解析失败"));
         delete m_modelFuncs;
         m_modelFuncs = nullptr;
+        m_hModelDll = nullptr;
         FreeLibrary(h);
         setModelReplacementStatus(QStringLiteral("失败"));
         return false;
@@ -1397,6 +1408,7 @@ bool Backend::loadModelDll()
         m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 协议版本不兼容"));
         delete m_modelFuncs;
         m_modelFuncs = nullptr;
+        m_hModelDll = nullptr;
         FreeLibrary(h);
         setModelReplacementStatus(QStringLiteral("失败"));
         return false;
@@ -1407,6 +1419,7 @@ bool Backend::loadModelDll()
         m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 初始化失败"));
         delete m_modelFuncs;
         m_modelFuncs = nullptr;
+        m_hModelDll = nullptr;
         FreeLibrary(h);
         setModelReplacementStatus(QStringLiteral("失败"));
         return false;
@@ -1418,24 +1431,45 @@ bool Backend::loadModelDll()
 
 void Backend::unloadModelDll()
 {
-    if (!m_modelFuncs) {
+    std::lock_guard<std::recursive_mutex> lock(m_modelDllMutex);
+    if (!m_modelFuncs || !m_hModelDll) {
+        m_modelFuncs = nullptr;
+        m_hModelDll = nullptr;
+        setModelReplacementRunning(false);
         return;
     }
+    detachModelDllCallbacks();
     if (m_modelFuncs->fn_stop_wait) {
         m_modelFuncs->fn_stop_wait();
     }
     if (m_modelFuncs->fn_shutdown) {
         m_modelFuncs->fn_shutdown();
     }
-    HMODULE h = m_modelFuncs->hDll;
+    HMODULE h = static_cast<HMODULE>(m_hModelDll);
     delete m_modelFuncs;
     m_modelFuncs = nullptr;
+    m_hModelDll = nullptr;
     FreeLibrary(h);
     setModelReplacementRunning(false);
 }
 
+void Backend::detachModelDllCallbacks()
+{
+    std::lock_guard<std::recursive_mutex> lock(m_modelDllMutex);
+    if (!m_modelFuncs || !m_hModelDll) {
+        return;
+    }
+    if (m_modelFuncs->fn_set_log_callback) {
+        m_modelFuncs->fn_set_log_callback(nullptr);
+    }
+    if (m_modelFuncs->fn_set_state_callback) {
+        m_modelFuncs->fn_set_state_callback(nullptr);
+    }
+}
+
 void Backend::requestModelReplacementRestart()
 {
+    std::lock_guard<std::recursive_mutex> lock(m_modelDllMutex);
     if (!modelRuntimeRequested() || !m_authSessionVerified) {
         return;
     }
@@ -1447,7 +1481,7 @@ void Backend::requestModelReplacementRestart()
     }
 
     m_modelReplacementRestartPending = true;
-    if (m_modelFuncs && m_modelFuncs->fn_is_waiting_for_process &&
+    if (m_modelFuncs && m_hModelDll && m_modelFuncs->fn_is_waiting_for_process &&
         m_modelFuncs->fn_is_waiting_for_process() == 1) {
         if (m_modelFuncs->fn_stop_wait) {
             m_modelFuncs->fn_stop_wait();
@@ -1460,17 +1494,17 @@ void Backend::requestModelReplacementRestart()
 
 void Backend::disableModelRuntimeAndRemoveLocal(const QString &status, bool removeLocalDll)
 {
-    if (m_modelReplacementRunning || m_modelFuncs) {
+    std::lock_guard<std::recursive_mutex> lock(m_modelDllMutex);
+    m_modelReplacementRestartPending = false;
+    if (m_modelFuncs && !m_hModelDll) {
+        m_modelFuncs = nullptr;
+    }
+    const bool hasLoadedModelDll = m_modelFuncs && m_hModelDll;
+    if (m_modelReplacementRunning || hasLoadedModelDll) {
         stopModelReplacementWait();
     }
-    if (m_modelFuncs) {
+    if (hasLoadedModelDll) {
         unloadModelDll();
-    }
-    if (m_modelArmOverrideEnabled) {
-        m_modelArmOverrideEnabled = false;
-        QSettings settings(QStringLiteral("NoteBot"), QStringLiteral("Injector"));
-        settings.setValue(QStringLiteral("modelArmOverrideEnabled"), false);
-        emit modelArmOverrideEnabledChanged();
     }
     setModelRuntimeAvailable(false);
     if (modelRuntimeRequested()) {
@@ -1535,6 +1569,10 @@ QString Backend::effectiveModelArmSize() const
 
 void Backend::handleModelDllState(const QString &key, const QString &value)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_modelDllMutex);
+    if (!m_modelFuncs || !m_hModelDll || !m_modelRuntimeAvailable) {
+        return;
+    }
     if (key == QStringLiteral("model_running")) {
         setModelReplacementRunning(value == QStringLiteral("true"));
         if (value != QStringLiteral("true") && m_modelReplacementRestartPending &&
@@ -1552,7 +1590,7 @@ void Backend::handleModelDllState(const QString &key, const QString &value)
     if (key == QStringLiteral("model_state")) {
         setModelReplacementStatus(value);
         if (m_modelReplacementRestartPending && m_modelReplacementRunning &&
-            m_modelFuncs && m_modelFuncs->fn_is_waiting_for_process &&
+            m_modelFuncs && m_hModelDll && m_modelFuncs->fn_is_waiting_for_process &&
             m_modelFuncs->fn_is_waiting_for_process() == 1) {
             if (m_modelFuncs->fn_stop_wait) {
                 m_modelFuncs->fn_stop_wait();
@@ -2344,6 +2382,7 @@ void Backend::setLicenseKey(const QString &key)
 
 QString Backend::callDll(const QString &action, const QString &json)
 {
+    std::lock_guard<std::mutex> lock(m_authCallMutex);
     if (!loadAuthDll()) {
         return QStringLiteral("{\"ok\":false,\"message\":\"dll_not_loaded\"}");
     }

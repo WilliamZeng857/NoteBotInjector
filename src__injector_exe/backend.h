@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QPointer>
 #include <functional>
+#include <mutex>
 #include "processmodel.h"
 #include "logmodel.h"
 #include "updater.h"
@@ -149,6 +150,7 @@ private:
     void unloadAuthDll();
     bool loadModelDll();
     void unloadModelDll();
+    void detachModelDllCallbacks();
     void setModelReplacementRunning(bool running);
     void setModelRuntimeAvailable(bool available);
     void setModelReplacementStatus(const QString &status);
@@ -217,6 +219,8 @@ private:
     QString m_initStatus;
     QString m_hostUpdateState = "idle";
     bool m_authUpdateRequired = false;
+    std::mutex m_authCallMutex;
+    std::recursive_mutex m_modelDllMutex;
 
     // DLL 句柄和函数表
     AuthDllFuncs *m_funcs = nullptr;

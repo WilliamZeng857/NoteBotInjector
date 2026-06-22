@@ -457,7 +457,9 @@ NBAPI int nb_call(const char* action,
     const QString act = action ? QString::fromUtf8(action).trimmed() : QString();
     const QJsonObject req = parseInputJson(json);
     const QJsonObject resp = NBAuth::V3::dispatchAction(g.v3, act, req);
-    publishSnapshotState();
+    if (act != QStringLiteral("model_runtime_policy_v1")) {
+        publishSnapshotState();
+    }
     return writeJsonOut(resp, out_json, out_size);
 }
 
