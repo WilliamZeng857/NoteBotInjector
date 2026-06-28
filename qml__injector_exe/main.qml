@@ -2,6 +2,7 @@
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
+import QtQuick.Dialogs
 import NoteBot 1.0
 
 Window {
@@ -865,7 +866,7 @@ Window {
 
                 Rectangle {
                     id: modelReplacementStrip
-                    visible: backend.modelRuntimeAvailable
+                    visible: true
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? 42 : 0
                     radius: 8
@@ -923,7 +924,7 @@ Window {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: "模型替换"
+                                text: "皮肤替换"
                                 color: backend.modelModificationEnabled
                                        ? (modelReplacementHoverRestored.hovered ? "#CFFAFE" : textPrimary)
                                        : (modelReplacementHoverRestored.hovered ? textPrimary : textSecondary)
@@ -1526,7 +1527,7 @@ Window {
                 visible: mainUI.detailPanel === "settings"
 
                 Column {
-                    visible: backend.modelRuntimeAvailable
+                    visible: true
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.leftMargin: 8
@@ -1540,7 +1541,7 @@ Window {
 
                         Text {
                             width: parent.width
-                            text: "Arm Lock"
+                            text: "启动皮肤替换"
                             color: textPrimary
                             font.pixelSize: 18
                             font.bold: true
@@ -1550,11 +1551,101 @@ Window {
 
                         Text {
                             width: parent.width
-                            text: "启动阶段固定 Steve / Alex 手臂类型"
+                            text: "启动时将自定义皮肤和手臂类型写入游戏"
                             color: textSecondary
                             font.pixelSize: 11
                             font.family: "Microsoft YaHei UI"
                             elide: Text.ElideRight
+                        }
+                    }
+
+                    // PNG file picker row
+                    Rectangle {
+                        width: parent.width
+                        height: 48
+                        radius: 8
+                        color: Qt.rgba(1, 1, 1, 0.03)
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.075)
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 12
+                            spacing: 10
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "皮肤 PNG"
+                                    color: textSecondary
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: backend.skinPngPath === "" ? "未选择" : backend.skinPngPath.split('/').pop().split('\\').pop()
+                                    color: backend.skinPngPath === "" ? textMuted : accentCyan
+                                    font.pixelSize: 10
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            Text {
+                                visible: backend.skinPngWidth > 0
+                                Layout.preferredWidth: 56
+                                text: backend.skinPngWidth + "×" + backend.skinPngHeight
+                                color: textSecondary
+                                font.pixelSize: 10
+                                font.family: "Segoe UI"
+                                horizontalAlignment: Text.AlignRight
+                            }
+
+                            Rectangle {
+                                Layout.preferredWidth: 64
+                                Layout.preferredHeight: 28
+                                radius: 6
+                                color: skinPickerHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.16) : Qt.rgba(1, 1, 1, 0.05)
+                                border.width: 1
+                                border.color: skinPickerHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.48) : Qt.rgba(1, 1, 1, 0.12)
+                                scale: skinPickerTap.pressed ? 0.95 : skinPickerHover.hovered ? 1.04 : 1
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                Behavior on scale { NumberAnimation { duration: 95; easing.type: Easing.OutCubic } }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "选择"
+                                    color: skinPickerHover.hovered ? accentCyan : textSecondary
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    font.family: "Microsoft YaHei UI"
+                                }
+
+                                HoverHandler { id: skinPickerHover }
+                                TapHandler {
+                                    id: skinPickerTap
+                                    onTapped: skinFileDialog.open()
+                                }
+                            }
+                        }
+                    }
+
+                    FileDialog {
+                        id: skinFileDialog
+                        title: "选择皮肤 PNG"
+                        nameFilters: ["PNG 图片 (*.png)"]
+                        fileMode: FileDialog.OpenFile
+                        onAccepted: {
+                            const path = selectedFile.toString().replace(/^(file:\/{3})|(qrc:\/{2})/, "");
+                            backend.setSkinPngPathFromQml(path)
                         }
                     }
 
@@ -1605,7 +1696,7 @@ Window {
 
                                 Text {
                                     Layout.fillWidth: true
-                                    text: backend.modelArmOverrideEnabled ? "On · 对新启动的游戏进程生效" : "Off · 保持游戏默认"
+                                    text: backend.modelArmOverrideEnabled ? "On · 对新启动的游戏进程生效" : "Off · 使用游戏默认手臂"
                                     color: backend.modelArmOverrideEnabled ? accentCyan : textMuted
                                     font.pixelSize: 10
                                     font.family: "Microsoft YaHei UI"

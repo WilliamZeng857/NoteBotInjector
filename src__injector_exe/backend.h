@@ -39,6 +39,9 @@ class Backend : public QObject
     Q_PROPERTY(bool modelRuntimeAvailable READ modelRuntimeAvailable NOTIFY modelRuntimeAvailableChanged)
     Q_PROPERTY(bool modelReplacementRunning READ modelReplacementRunning NOTIFY modelReplacementRunningChanged)
     Q_PROPERTY(QString modelReplacementStatus READ modelReplacementStatus NOTIFY modelReplacementStatusChanged)
+    Q_PROPERTY(QString skinPngPath READ skinPngPath WRITE setSkinPngPath NOTIFY skinPngPathChanged)
+    Q_PROPERTY(int skinPngWidth READ skinPngWidth NOTIFY skinPngInfoChanged)
+    Q_PROPERTY(int skinPngHeight READ skinPngHeight NOTIFY skinPngInfoChanged)
     Q_PROPERTY(bool initializing READ initializing NOTIFY initializingChanged)
     Q_PROPERTY(int initStep READ initStep NOTIFY initStepChanged)
     Q_PROPERTY(QString initStatus READ initStatus NOTIFY initStatusChanged)
@@ -70,6 +73,10 @@ public:
     bool modelRuntimeAvailable() const { return m_modelRuntimeAvailable; }
     bool modelReplacementRunning() const { return m_modelReplacementRunning; }
     QString modelReplacementStatus() const { return m_modelReplacementStatus; }
+    QString skinPngPath() const { return m_skinPngPath; }
+    void setSkinPngPath(const QString &path);
+    int skinPngWidth() const { return m_skinPngWidth; }
+    int skinPngHeight() const { return m_skinPngHeight; }
     void setModelModificationEnabled(bool enabled);
     void setModelArmOverrideEnabled(bool enabled);
     void setModelArmSize(const QString &size);
@@ -83,6 +90,8 @@ public:
     Q_INVOKABLE void activateModel(const QString &modelId);
     Q_INVOKABLE void startModelReplacementWait();
     Q_INVOKABLE void stopModelReplacementWait();
+    Q_INVOKABLE void setSkinPngPathFromQml(const QString &path);
+    bool isValidSkinPng(const QString &path);
 
     // 同步加载 DLL（只 LoadLibrary + 解析导出，不做验证）
     bool loadAuthDll();
@@ -114,6 +123,8 @@ signals:
     void modelRuntimeAvailableChanged();
     void modelReplacementRunningChanged();
     void modelReplacementStatusChanged();
+    void skinPngPathChanged();
+    void skinPngInfoChanged();
     void splashFinished();
     void initializingChanged();
     void initStepChanged();
@@ -157,6 +168,7 @@ private:
     void requestModelReplacementRestart();
     bool modelRuntimeRequested() const;
     QString effectiveModelArmSize() const;
+    QString effectiveClassicSkinId() const;
     void disableModelRuntimeAndRemoveLocal(const QString &status, bool removeLocalDll);
     void syncStatusFromDll();
     void syncHostUpdateSnapshot(const QString &state, bool authDllPendingReplace = false);
@@ -208,6 +220,9 @@ private:
     bool m_modelReplacementRunning = false;
     bool m_modelReplacementRestartPending = false;
     QString m_modelReplacementStatus = "已关闭";
+    QString m_skinPngPath;
+    int m_skinPngWidth = 0;
+    int m_skinPngHeight = 0;
     bool m_isActivated = false;
     bool m_authSessionVerified = false;
     QString m_licenseKey;

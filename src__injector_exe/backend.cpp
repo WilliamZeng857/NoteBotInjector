@@ -12,6 +12,7 @@
 #include <QElapsedTimer>
 #include <QThread>
 #include <thread>
+#include <QUrl>
 #include <QMetaObject>
 #include <QSettings>
 #include <QDateTime>
@@ -21,6 +22,7 @@
 #include <QJsonArray>
 #include <QJsonParseError>
 #include <QRegularExpression>
+#include <QImage>
 #include <algorithm>
 #include <windows.h>
 #include "../src__auth_dll/include/notebot_auth.h"
@@ -583,6 +585,7 @@ Backend::Backend(ProcessModel *procModel,
     m_modelModificationEnabled = settings.value(QStringLiteral("modelModificationEnabled"), false).toBool();
     m_modelArmOverrideEnabled = settings.value(QStringLiteral("modelArmOverrideEnabled"), false).toBool();
     m_modelArmSize = normalizeModelArmSize(settings.value(QStringLiteral("modelArmSize"), QStringLiteral("slim")).toString());
+    m_skinPngPath = settings.value(QStringLiteral("skinPngPath")).toString();
     m_modelReplacementStatus = modelRuntimeRequested()
         ? QStringLiteral("等待密钥验证")
         : QStringLiteral("已关闭");
@@ -878,22 +881,44 @@ void Backend::startModelReplacementWait()
         return;
     }
     ModelCatalogEntry active;
+    const bool classicSkin = m_modelModificationEnabled && !m_skinPngPath.isEmpty();
     if (m_modelModificationEnabled) {
-        if (!m_modelCatalogModel) {
-            m_logModel->append(QStringLiteral("[MODEL] 模型列表不可用"));
-            setModelReplacementStatus(QStringLiteral("失败"));
-            return;
-        }
-        if (!m_modelCatalogModel->activeEntry(&active)) {
-            m_logModel->append(QStringLiteral("[MODEL] 请选择一个已拥有的模型，总闸保持开启后会自动等待"));
-            setModelReplacementStatus(QStringLiteral("等待选择模型"));
-            return;
-        }
-        if (active.modelFile.isEmpty() || active.textureFile.isEmpty() ||
-            !QFile::exists(active.modelFile) || !QFile::exists(active.textureFile)) {
-            m_logModel->append(QStringLiteral("[MODEL] 当前模型资源缺失，请重新检查密钥或刷新模型列表"));
-            setModelReplacementStatus(QStringLiteral("等待模型资源"));
-            return;
+        if (classicSkin) {
+            // Classic square skin mode: local PNG, no server model catalog
+            QImage png(m_skinPngPath);
+            if (png.isNull()) {
+                m_logModel->append(QStringLiteral("[MODEL] 皮肤 PNG 无法读取，请重新选择"));
+                setModelReplacementStatus(QStringLiteral("等待选择皮肤文件"));
+                return;
+            }
+            const QSize size = png.size();
+            if (!(size == QSize(64, 64) || size == QSize(128, 128) || size == QSize(256, 256))) {
+                m_logModel->append(QStringLiteral("[MODEL] 皮肤 PNG 必须是 64/128/256 像素，当前 %1x%2")
+                                       .arg(size.width()).arg(size.height()));
+                setModelReplacementStatus(QStringLiteral("等待选择皮肤文件"));
+                return;
+            }
+            m_skinPngWidth = size.width();
+            m_skinPngHeight = size.height();
+            emit skinPngInfoChanged();
+        } else {
+            // Server model mode: requires ModelCatalogModel
+            if (!m_modelCatalogModel) {
+                m_logModel->append(QStringLiteral("[MODEL] 模型列表不可用"));
+                setModelReplacementStatus(QStringLiteral("失败"));
+                return;
+            }
+            if (!m_modelCatalogModel->activeEntry(&active)) {
+                m_logModel->append(QStringLiteral("[MODEL] 请选择一个已拥有的模型，总闸保持开启后会自动等待"));
+                setModelReplacementStatus(QStringLiteral("等待选择模型"));
+                return;
+            }
+            if (active.modelFile.isEmpty() || active.textureFile.isEmpty() ||
+                !QFile::exists(active.modelFile) || !QFile::exists(active.textureFile)) {
+                m_logModel->append(QStringLiteral("[MODEL] 当前模型资源缺失，请重新检查密钥或刷新模型列表"));
+                setModelReplacementStatus(QStringLiteral("等待模型资源"));
+                return;
+            }
         }
     }
     if (!loadModelDll()) {
@@ -905,13 +930,22 @@ void Backend::startModelReplacementWait()
     cfg[QStringLiteral("arm_override_enabled")] = m_modelArmOverrideEnabled;
     cfg[QStringLiteral("arm_size")] = effectiveModelArmSize();
     if (m_modelModificationEnabled) {
-        cfg[QStringLiteral("geometry_path")] = active.modelFile;
-        cfg[QStringLiteral("texture_path")] = active.textureFile;
-        cfg[QStringLiteral("skin_id")] =
-            QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
-        cfg[QStringLiteral("trusted")] = true;
-        cfg[QStringLiteral("premium")] = true;
-        cfg[QStringLiteral("persona")] = true;
+        if (classicSkin) {
+            cfg[QStringLiteral("skin_mode")] = QStringLiteral("classic");
+            cfg[QStringLiteral("texture_path")] = m_skinPngPath;
+            cfg[QStringLiteral("skin_id")] = effectiveClassicSkinId();
+            cfg[QStringLiteral("trusted")] = true;
+            cfg[QStringLiteral("premium")] = true;
+            cfg[QStringLiteral("persona")] = false;
+        } else {
+            cfg[QStringLiteral("geometry_path")] = active.modelFile;
+            cfg[QStringLiteral("texture_path")] = active.textureFile;
+            cfg[QStringLiteral("skin_id")] =
+                QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
+            cfg[QStringLiteral("trusted")] = true;
+            cfg[QStringLiteral("premium")] = true;
+            cfg[QStringLiteral("persona")] = true;
+        }
     }
     cfg[QStringLiteral("process_timeout_ms")] = 86400 * 1000;
     cfg[QStringLiteral("hook_timeout_ms")] = 90000;
@@ -924,7 +958,9 @@ void Backend::startModelReplacementWait()
         setModelReplacementRunning(true);
         setModelReplacementStatus(QStringLiteral("正在运行"));
         const QString targetLabel = m_modelModificationEnabled
-            ? active.name
+            ? (classicSkin
+                ? QStringLiteral("经典皮肤 %1").arg(modelArmSizeLabel(m_modelArmSize))
+                : active.name)
             : QStringLiteral("Arm Lock %1").arg(modelArmSizeLabel(m_modelArmSize));
         m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(targetLabel));
     } else if (rc == 2) {
@@ -1574,6 +1610,77 @@ QString Backend::effectiveModelArmSize() const
     return m_modelArmOverrideEnabled
         ? normalizeModelArmSize(m_modelArmSize)
         : QStringLiteral("slim");
+}
+
+QString Backend::effectiveClassicSkinId() const
+{
+    const QString arm = effectiveModelArmSize();
+    return arm == QStringLiteral("wide")
+        ? QStringLiteral("00000000-0000-0000-0000-000000000000.NonsyncCustom")
+        : QStringLiteral("00000000-0000-0000-0000-000000000000.NonsyncCustomSlim");
+}
+
+void Backend::setSkinPngPath(const QString &path)
+{
+    const QString trimmed = path.trimmed();
+    if (m_skinPngPath == trimmed) {
+        return;
+    }
+    if (!trimmed.isEmpty()) {
+        QImage png(trimmed);
+        if (png.isNull()) {
+            m_logModel->append(QStringLiteral("[MODEL] 皮肤文件无法读取或不是 PNG：%1").arg(trimmed));
+            return;
+        }
+        const QSize size = png.size();
+        if (!(size == QSize(64, 64) || size == QSize(128, 128) || size == QSize(256, 256))) {
+            m_logModel->append(QStringLiteral("[MODEL] 皮肤 PNG 必须是 64/128/256 像素，当前 %1x%2")
+                                   .arg(size.width()).arg(size.height()));
+            return;
+        }
+        m_skinPngWidth = size.width();
+        m_skinPngHeight = size.height();
+    } else {
+        m_skinPngWidth = 0;
+        m_skinPngHeight = 0;
+    }
+    m_skinPngPath = trimmed;
+    QSettings settings(QStringLiteral("NoteBot"), QStringLiteral("Injector"));
+    settings.setValue(QStringLiteral("skinPngPath"), trimmed);
+    emit skinPngPathChanged();
+    emit skinPngInfoChanged();
+    m_logModel->append(trimmed.isEmpty()
+        ? QStringLiteral("[MODEL] 已清除皮肤 PNG 路径")
+        : QStringLiteral("[MODEL] 皮肤 PNG 已选择：%1 (%2x%3)")
+              .arg(trimmed).arg(m_skinPngWidth).arg(m_skinPngHeight));
+    if (modelRuntimeRequested() && m_authSessionVerified) {
+        requestModelReplacementRestart();
+    }
+}
+
+void Backend::setSkinPngPathFromQml(const QString &path)
+{
+    const QString trimmed = path.trimmed();
+    // QML FileDialog passes file:// URL on some platforms; strip prefix
+    QString clean = trimmed;
+    if (clean.startsWith(QStringLiteral("file:///"))) {
+        clean = clean.mid(8);
+    } else if (clean.startsWith(QStringLiteral("file://"))) {
+        clean = clean.mid(7);
+    }
+    // Decode percent-encoded characters
+    clean = QUrl::fromPercentEncoding(clean.toUtf8());
+    clean = QDir::toNativeSeparators(clean);
+    setSkinPngPath(clean);
+}
+
+bool Backend::isValidSkinPng(const QString &path)
+{
+    if (path.isEmpty()) return false;
+    QImage png(path);
+    if (png.isNull()) return false;
+    const QSize size = png.size();
+    return size == QSize(64, 64) || size == QSize(128, 128) || size == QSize(256, 256);
 }
 
 void Backend::handleModelDllState(const QString &key, const QString &value)
