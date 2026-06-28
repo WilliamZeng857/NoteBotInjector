@@ -9,7 +9,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
 set(CMAKE_PREFIX_PATH "C:/QtBuild/qt6-static")
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Network)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick QuickControls2 QuickDialogs2 Network)
 
 set(SOURCES
     src__injector_exe/main.cpp
@@ -137,6 +137,7 @@ target_link_libraries(NoteBotInjector PRIVATE
     Qt6::Gui
     Qt6::Quick
     Qt6::QuickControls2
+    Qt6::QuickDialogs2
     Qt6::Network
 )
 
