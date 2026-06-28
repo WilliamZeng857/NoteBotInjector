@@ -1716,51 +1716,6 @@ Window {
                         }
                     }
 
-                    Rectangle {
-                        id: armLockToggle
-                        width: parent.width
-                        height: 48
-                        radius: 8
-                        color: binding(function() {
-                            if (armLockTap.pressed) return Qt.rgba(0.133, 0.827, 0.933, 0.13);
-                            return armLockHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055);
-                        })
-                        border.width: 1
-                        border.color: armLockHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.58) : Qt.rgba(0.133, 0.827, 0.933, 0.34)
-                        scale: armLockTap.pressed ? 0.985 : armLockHover.hovered ? 1.008 : 1
-                        Behavior on color { ColorAnimation { duration: 130 } }
-                        Behavior on border.color { ColorAnimation { duration: 130 } }
-                        Behavior on scale { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
-
-                        HoverHandler { id: armLockHover }
-                        TapHandler { id: armLockTap }
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 14
-                            anchors.rightMargin: 12
-                            spacing: 10
-                            Text {
-                                Layout.fillWidth: true
-                                text: "手臂类型"
-                                color: textPrimary
-                                font.pixelSize: 13
-                                font.bold: true
-                                font.family: "Microsoft YaHei UI"
-                                elide: Text.ElideRight
-                            }
-                            Text {
-                                Layout.preferredWidth: 56
-                                text: backend.modelArmSize === "slim" ? "Alex · 细" : "Steve · 粗"
-                                color: accentCyan
-                                font.pixelSize: 11
-                                font.bold: true
-                                font.family: "Segoe UI"
-                                horizontalAlignment: Text.AlignRight
-                            }
-                        }
-                    }
-
                     Row {
                         width: parent.width
                         height: 42
