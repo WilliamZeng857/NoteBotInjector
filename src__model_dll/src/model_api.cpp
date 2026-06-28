@@ -658,7 +658,6 @@ struct PayloadConfig {
     bool modelEnabled = true;
     bool armOverrideEnabled = false;
     QString skinId = QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
-    QString skinMode;
     QString geometryPath;
     QString texturePath;
     QString geometryData;
@@ -778,7 +777,6 @@ std::optional<PayloadConfig> parseConfig(const char *json, QString *error)
     PayloadConfig cfg;
     cfg.modelEnabled = obj.value(QStringLiteral("model_enabled")).toBool(true);
     cfg.armOverrideEnabled = obj.value(QStringLiteral("arm_override_enabled")).toBool(false);
-    cfg.skinMode = obj.value(QStringLiteral("skin_mode")).toString().trimmed();
     cfg.skinId = obj.value(QStringLiteral("skin_id")).toString(cfg.skinId).trimmed();
     cfg.geometryPath = obj.value(QStringLiteral("geometry_path")).toString().trimmed();
     cfg.texturePath = obj.value(QStringLiteral("texture_path")).toString().trimmed();
@@ -799,7 +797,6 @@ std::optional<PayloadConfig> parseConfig(const char *json, QString *error)
     }
     if (!cfg.modelEnabled) {
         cfg.skinId.clear();
-        cfg.skinMode.clear();
         cfg.geometryPath.clear();
         cfg.texturePath.clear();
         cfg.resourcePatch.clear();
@@ -811,30 +808,7 @@ std::optional<PayloadConfig> parseConfig(const char *json, QString *error)
         cfg.skinRgba.clear();
         return cfg;
     }
-    // Classic mode: local PNG square skin, no geometry/animation from server
-    if (cfg.skinMode == QStringLiteral("classic")) {
-        if (cfg.texturePath.isEmpty() || !QFileInfo::exists(cfg.texturePath)) {
-            if (error) {
-                *error = QStringLiteral("经典模式缺少有效皮肤 PNG 路径");
-            }
-            return std::nullopt;
-        }
-        if (!loadSkin(&cfg, error)) {
-            return std::nullopt;
-        }
-        // Auto-generate resourcePatch to point at vanilla geometry
-        if (cfg.resourcePatch.isEmpty()) {
-            const QString geoId = cfg.armSize == QStringLiteral("wide")
-                ? QStringLiteral("geometry.humanoid.custom")
-                : QStringLiteral("geometry.humanoid.customSlim");
-            cfg.resourcePatch = QString::fromUtf8(QJsonDocument(QJsonObject{
-                {QStringLiteral("geometry"), QJsonObject{{QStringLiteral("default"), geoId}}}
-            }).toJson(QJsonDocument::Compact));
-        }
-        // geometryData / geometryEngineVersion / animationData stay empty → selectedHooks() skips
-        return cfg;
-    }
-    // Server model mode: geometry + texture both required
+    // geometry + texture both required
     if (cfg.geometryPath.isEmpty() || cfg.texturePath.isEmpty()) {
         if (error) {
             *error = QStringLiteral("缺少 geometry_path 或 texture_path");

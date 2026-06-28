@@ -586,6 +586,7 @@ Backend::Backend(ProcessModel *procModel,
     m_modelArmOverrideEnabled = settings.value(QStringLiteral("modelArmOverrideEnabled"), false).toBool();
     m_modelArmSize = normalizeModelArmSize(settings.value(QStringLiteral("modelArmSize"), QStringLiteral("slim")).toString());
     m_skinPngPath = settings.value(QStringLiteral("skinPngPath")).toString();
+    m_classicModeEnabled = settings.value(QStringLiteral("classicModeEnabled"), false).toBool();
     m_modelReplacementStatus = modelRuntimeRequested()
         ? QStringLiteral("等待密钥验证")
         : QStringLiteral("已关闭");
@@ -881,10 +882,10 @@ void Backend::startModelReplacementWait()
         return;
     }
     ModelCatalogEntry active;
-    const bool classicSkin = m_modelModificationEnabled && !m_skinPngPath.isEmpty();
+    const bool classicSkin = m_modelModificationEnabled && m_classicModeEnabled && !m_skinPngPath.isEmpty();
     if (m_modelModificationEnabled) {
         if (classicSkin) {
-            // Classic square skin mode: local PNG, no server model catalog
+            // Classic square skin: use hardcoded vanilla geometry + user PNG
             QImage png(m_skinPngPath);
             if (png.isNull()) {
                 m_logModel->append(QStringLiteral("[MODEL] 皮肤 PNG 无法读取，请重新选择"));
@@ -901,6 +902,17 @@ void Backend::startModelReplacementWait()
             m_skinPngWidth = size.width();
             m_skinPngHeight = size.height();
             emit skinPngInfoChanged();
+
+            const QString arm = effectiveModelArmSize();
+            const QString geomPath = classicGeometryTempPath();
+            if (!writeClassicGeometry(geomPath, arm)) {
+                m_logModel->append(QStringLiteral("[MODEL] 无法生成方块人几何文件"));
+                setModelReplacementStatus(QStringLiteral("失败"));
+                return;
+            }
+            active.modelFile = geomPath;
+            active.textureFile = m_skinPngPath;
+            active.name = QStringLiteral("经典方块人 %1").arg(modelArmSizeLabel(arm));
         } else {
             // Server model mode: requires ModelCatalogModel
             if (!m_modelCatalogModel) {
@@ -930,22 +942,13 @@ void Backend::startModelReplacementWait()
     cfg[QStringLiteral("arm_override_enabled")] = m_modelArmOverrideEnabled;
     cfg[QStringLiteral("arm_size")] = effectiveModelArmSize();
     if (m_modelModificationEnabled) {
-        if (classicSkin) {
-            cfg[QStringLiteral("skin_mode")] = QStringLiteral("classic");
-            cfg[QStringLiteral("texture_path")] = m_skinPngPath;
-            cfg[QStringLiteral("skin_id")] = effectiveClassicSkinId();
-            cfg[QStringLiteral("trusted")] = true;
-            cfg[QStringLiteral("premium")] = true;
-            cfg[QStringLiteral("persona")] = false;
-        } else {
-            cfg[QStringLiteral("geometry_path")] = active.modelFile;
-            cfg[QStringLiteral("texture_path")] = active.textureFile;
-            cfg[QStringLiteral("skin_id")] =
-                QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
-            cfg[QStringLiteral("trusted")] = true;
-            cfg[QStringLiteral("premium")] = true;
-            cfg[QStringLiteral("persona")] = true;
-        }
+        cfg[QStringLiteral("geometry_path")] = active.modelFile;
+        cfg[QStringLiteral("texture_path")] = active.textureFile;
+        cfg[QStringLiteral("skin_id")] =
+            QStringLiteral("c18e65aa-7b21-4637-9b63-8ad63622ef01.CustomSlimaf8fd34e3bc6df55dfee6dd80d80a1bb");
+        cfg[QStringLiteral("trusted")] = true;
+        cfg[QStringLiteral("premium")] = true;
+        cfg[QStringLiteral("persona")] = true;
     }
     cfg[QStringLiteral("process_timeout_ms")] = 86400 * 1000;
     cfg[QStringLiteral("hook_timeout_ms")] = 90000;
@@ -958,9 +961,7 @@ void Backend::startModelReplacementWait()
         setModelReplacementRunning(true);
         setModelReplacementStatus(QStringLiteral("正在运行"));
         const QString targetLabel = m_modelModificationEnabled
-            ? (classicSkin
-                ? QStringLiteral("经典皮肤 %1").arg(modelArmSizeLabel(m_modelArmSize))
-                : active.name)
+            ? active.name
             : QStringLiteral("Arm Lock %1").arg(modelArmSizeLabel(m_modelArmSize));
         m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(targetLabel));
     } else if (rc == 2) {
@@ -1618,6 +1619,121 @@ QString Backend::effectiveClassicSkinId() const
     return arm == QStringLiteral("wide")
         ? QStringLiteral("00000000-0000-0000-0000-000000000000.NonsyncCustom")
         : QStringLiteral("00000000-0000-0000-0000-000000000000.NonsyncCustomSlim");
+}
+
+void Backend::setClassicModeEnabled(bool enabled)
+{
+    if (m_classicModeEnabled == enabled) {
+        return;
+    }
+    m_classicModeEnabled = enabled;
+    QSettings settings(QStringLiteral("NoteBot"), QStringLiteral("Injector"));
+    settings.setValue(QStringLiteral("classicModeEnabled"), enabled);
+    emit classicModeEnabledChanged();
+    m_logModel->append(enabled
+        ? QStringLiteral("[MODEL] 经典方块人覆盖已开启")
+        : QStringLiteral("[MODEL] 经典方块人覆盖已关闭"));
+    if (modelRuntimeRequested() && m_authSessionVerified) {
+        requestModelReplacementRestart();
+    }
+}
+
+QString Backend::classicGeometryTempPath() const
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+        .absoluteFilePath(QStringLiteral("classic_player_geometry.json"));
+}
+
+bool Backend::writeClassicGeometry(const QString &path, const QString &armSize) const
+{
+    // Hardcoded vanilla square-person geometry JSON.
+    // geometry.humanoid.custom = Steve (wide, 4px arms)
+    // geometry.humanoid.customSlim = Alex (slim, 3px arms)
+    // Bones match the verified geometry from minecraft_player_geometry.json.
+    static const QString kSlimGeometry =
+        QStringLiteral("{\"format_version\":\"1.12.0\",\"minecraft:geometry\":["
+        "{\"description\":{\"identifier\":\"geometry.humanoid.customSlim\","
+        "\"texture_width\":64,\"texture_height\":64,\"visible_bounds_width\":1,"
+        "\"visible_bounds_height\":2,\"visible_bounds_offset\":[0,1,0]},"
+        "\"bones\":["
+        "{\"name\":\"root\",\"pivot\":[0,0,0]},"
+        "{\"name\":\"waist\",\"parent\":\"root\",\"pivot\":[0,12,0]},"
+        "{\"name\":\"body\",\"parent\":\"waist\",\"pivot\":[0,24,0],"
+        "\"cubes\":[{\"origin\":[-4,12,-2],\"size\":[8,12,4],\"uv\":[16,16]}]},"
+        "{\"name\":\"head\",\"parent\":\"body\",\"pivot\":[0,24,0],"
+        "\"cubes\":[{\"origin\":[-4,24,-4],\"size\":[8,8,8],\"uv\":[0,0]}]},"
+        "{\"name\":\"hat\",\"parent\":\"head\",\"pivot\":[0,24,0],"
+        "\"cubes\":[{\"origin\":[-4,24,-4],\"size\":[8,8,8],\"uv\":[32,0],\"inflate\":0.5}]},"
+        "{\"name\":\"rightLeg\",\"parent\":\"root\",\"pivot\":[-1.9,12,0],"
+        "\"cubes\":[{\"origin\":[-3.9,0,-2],\"size\":[4,12,4],\"uv\":[0,16]}]},"
+        "{\"name\":\"rightPants\",\"parent\":\"rightLeg\",\"pivot\":[-1.9,12,0],"
+        "\"cubes\":[{\"origin\":[-3.9,0,-2],\"size\":[4,12,4],\"uv\":[0,32],\"inflate\":0.25}]},"
+        "{\"name\":\"leftLeg\",\"parent\":\"root\",\"pivot\":[1.9,12,0],\"mirror\":true,"
+        "\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[16,48]}]},"
+        "{\"name\":\"leftPants\",\"parent\":\"leftLeg\",\"pivot\":[1.9,12,0],"
+        "\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[0,48],\"inflate\":0.25}]},"
+        "{\"name\":\"leftArm\",\"parent\":\"body\",\"pivot\":[5,21.5,0],"
+        "\"cubes\":[{\"origin\":[4,11.5,-2],\"size\":[3,12,4],\"uv\":[32,48]}]},"
+        "{\"name\":\"leftSleeve\",\"parent\":\"leftArm\",\"pivot\":[5,21.5,0],"
+        "\"cubes\":[{\"origin\":[4,11.5,-2],\"size\":[3,12,4],\"uv\":[48,48],\"inflate\":0.25}]},"
+        "{\"name\":\"leftItem\",\"parent\":\"leftArm\",\"pivot\":[6,14.5,1]},"
+        "{\"name\":\"rightArm\",\"parent\":\"body\",\"pivot\":[-5,21.5,0],"
+        "\"cubes\":[{\"origin\":[-7,11.5,-2],\"size\":[3,12,4],\"uv\":[40,16]}]},"
+        "{\"name\":\"rightSleeve\",\"parent\":\"rightArm\",\"pivot\":[-5,21.5,0],"
+        "\"cubes\":[{\"origin\":[-7,11.5,-2],\"size\":[3,12,4],\"uv\":[40,32],\"inflate\":0.25}]},"
+        "{\"name\":\"rightItem\",\"parent\":\"rightArm\",\"pivot\":[-6,14.5,1],"
+        "\"locators\":{\"lead_hold\":[-6,14.5,1]}},"
+        "{\"name\":\"jacket\",\"parent\":\"body\",\"pivot\":[0,24,0],"
+        "\"cubes\":[{\"origin\":[-4,12,-2],\"size\":[8,12,4],\"uv\":[16,32],\"inflate\":0.25}]},"
+        "{\"name\":\"cape\",\"parent\":\"body\",\"pivot\":[0,24,-3]}"
+        "]}]}");
+
+    static const QString kWideGeometry =
+        QStringLiteral("{\"format_version\":\"1.12.0\",\"minecraft:geometry\":["
+        "{\"description\":{\"identifier\":\"geometry.humanoid.custom\","
+        "\"texture_width\":64,\"texture_height\":64,\"visible_bounds_width\":1,"
+        "\"visible_bounds_height\":2,\"visible_bounds_offset\":[0,1,0]},"
+        "\"bones\":["
+        "{\"name\":\"root\",\"pivot\":[0,0,0]},"
+        "{\"name\":\"waist\",\"parent\":\"root\",\"pivot\":[0,12,0]},"
+        "{\"name\":\"body\",\"parent\":\"waist\",\"pivot\":[0,24,0],"
+        "\"cubes\":[{\"origin\":[-4,12,-2],\"size\":[8,12,4],\"uv\":[16,16]}]},"
+        "{\"name\":\"head\",\"parent\":\"body\",\"pivot\":[0,24,0],"
+        "\"cubes\":[{\"origin\":[-4,24,-4],\"size\":[8,8,8],\"uv\":[0,0]}]},"
+        "{\"name\":\"hat\",\"parent\":\"head\",\"pivot\":[0,24,0],"
+        "\"cubes\":[{\"origin\":[-4,24,-4],\"size\":[8,8,8],\"uv\":[32,0],\"inflate\":0.5}]},"
+        "{\"name\":\"leftArm\",\"parent\":\"body\",\"pivot\":[5,22,0],"
+        "\"cubes\":[{\"origin\":[4,12,-2],\"size\":[4,12,4],\"uv\":[32,48]}]},"
+        "{\"name\":\"leftSleeve\",\"parent\":\"leftArm\",\"pivot\":[5,22,0],"
+        "\"cubes\":[{\"origin\":[4,12,-2],\"size\":[4,12,4],\"uv\":[48,48],\"inflate\":0.25}]},"
+        "{\"name\":\"leftItem\",\"parent\":\"leftArm\",\"pivot\":[6,15,1]},"
+        "{\"name\":\"rightArm\",\"parent\":\"body\",\"pivot\":[-5,22,0],"
+        "\"cubes\":[{\"origin\":[-8,12,-2],\"size\":[4,12,4],\"uv\":[40,16]}]},"
+        "{\"name\":\"rightSleeve\",\"parent\":\"rightArm\",\"pivot\":[-5,22,0],"
+        "\"cubes\":[{\"origin\":[-8,12,-2],\"size\":[4,12,4],\"uv\":[40,32],\"inflate\":0.25}]},"
+        "{\"name\":\"rightItem\",\"parent\":\"rightArm\",\"pivot\":[-6,15,1],"
+        "\"locators\":{\"lead_hold\":[-6,15,1]}},"
+        "{\"name\":\"leftLeg\",\"parent\":\"root\",\"pivot\":[1.9,12,0],"
+        "\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[16,48]}]},"
+        "{\"name\":\"leftPants\",\"parent\":\"leftLeg\",\"pivot\":[1.9,12,0],"
+        "\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[0,48],\"inflate\":0.25}]},"
+        "{\"name\":\"rightLeg\",\"parent\":\"root\",\"pivot\":[-1.9,12,0],"
+        "\"cubes\":[{\"origin\":[-3.9,0,-2],\"size\":[4,12,4],\"uv\":[0,16]}]},"
+        "{\"name\":\"rightPants\",\"parent\":\"rightLeg\",\"pivot\":[-1.9,12,0],"
+        "\"cubes\":[{\"origin\":[-3.9,0,-2],\"size\":[4,12,4],\"uv\":[0,32],\"inflate\":0.25}]},"
+        "{\"name\":\"jacket\",\"parent\":\"body\",\"pivot\":[0,24,0],"
+        "\"cubes\":[{\"origin\":[-4,12,-2],\"size\":[8,12,4],\"uv\":[16,32],\"inflate\":0.25}]},"
+        "{\"name\":\"cape\",\"parent\":\"body\",\"pivot\":[0,24,-3]}"
+        "]}]}");
+
+    const QString &json = armSize == QStringLiteral("wide") ? kWideGeometry : kSlimGeometry;
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return false;
+    }
+    file.write(json.toUtf8());
+    file.close();
+    return true;
 }
 
 void Backend::setSkinPngPath(const QString &path)

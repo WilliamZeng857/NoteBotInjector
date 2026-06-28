@@ -1650,6 +1650,73 @@ Window {
                     }
 
                     Rectangle {
+                        id: classicModeToggle
+                        width: parent.width
+                        height: 48
+                        radius: 8
+                        color: classicTap.pressed
+                               ? (backend.classicModeEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : Qt.rgba(1, 1, 1, 0.085))
+                               : backend.classicModeEnabled
+                                 ? (classicHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055))
+                                 : (classicHover.hovered ? Qt.rgba(1, 1, 1, 0.062) : Qt.rgba(1, 1, 1, 0.025))
+                        border.width: 1
+                        border.color: backend.classicModeEnabled
+                                      ? (classicHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.58) : Qt.rgba(0.133, 0.827, 0.933, 0.34))
+                                      : (classicHover.hovered ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.07))
+                        scale: classicTap.pressed ? 0.985 : classicHover.hovered ? 1.008 : 1
+                        Behavior on color { ColorAnimation { duration: 130 } }
+                        Behavior on border.color { ColorAnimation { duration: 130 } }
+                        Behavior on scale { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
+
+                        HoverHandler { id: classicHover }
+                        TapHandler {
+                            id: classicTap
+                            onTapped: backend.classicModeEnabled = !backend.classicModeEnabled
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 12
+                            spacing: 10
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "经典方块人覆盖"
+                                    color: backend.classicModeEnabled ? textPrimary : textSecondary
+                                    font.pixelSize: 13
+                                    font.bold: true
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: backend.classicModeEnabled ? "On · 使用原版方块人几何 + 自定义贴图" : "Off · 使用服务器立体模型"
+                                    color: backend.classicModeEnabled ? accentCyan : textMuted
+                                    font.pixelSize: 10
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            Text {
+                                Layout.preferredWidth: 44
+                                text: backend.classicModeEnabled ? "ON" : "OFF"
+                                color: backend.classicModeEnabled ? accentCyan : textMuted
+                                font.pixelSize: 11
+                                font.bold: true
+                                font.family: "Segoe UI"
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
+                    }
+
+                    Rectangle {
                         id: armLockToggle
                         width: parent.width
                         height: 48

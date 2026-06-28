@@ -42,6 +42,7 @@ class Backend : public QObject
     Q_PROPERTY(QString skinPngPath READ skinPngPath WRITE setSkinPngPath NOTIFY skinPngPathChanged)
     Q_PROPERTY(int skinPngWidth READ skinPngWidth NOTIFY skinPngInfoChanged)
     Q_PROPERTY(int skinPngHeight READ skinPngHeight NOTIFY skinPngInfoChanged)
+    Q_PROPERTY(bool classicModeEnabled READ classicModeEnabled WRITE setClassicModeEnabled NOTIFY classicModeEnabledChanged)
     Q_PROPERTY(bool initializing READ initializing NOTIFY initializingChanged)
     Q_PROPERTY(int initStep READ initStep NOTIFY initStepChanged)
     Q_PROPERTY(QString initStatus READ initStatus NOTIFY initStatusChanged)
@@ -77,6 +78,8 @@ public:
     void setSkinPngPath(const QString &path);
     int skinPngWidth() const { return m_skinPngWidth; }
     int skinPngHeight() const { return m_skinPngHeight; }
+    bool classicModeEnabled() const { return m_classicModeEnabled; }
+    void setClassicModeEnabled(bool enabled);
     void setModelModificationEnabled(bool enabled);
     void setModelArmOverrideEnabled(bool enabled);
     void setModelArmSize(const QString &size);
@@ -125,6 +128,7 @@ signals:
     void modelReplacementStatusChanged();
     void skinPngPathChanged();
     void skinPngInfoChanged();
+    void classicModeEnabledChanged();
     void splashFinished();
     void initializingChanged();
     void initStepChanged();
@@ -169,6 +173,8 @@ private:
     bool modelRuntimeRequested() const;
     QString effectiveModelArmSize() const;
     QString effectiveClassicSkinId() const;
+    QString classicGeometryTempPath() const;
+    bool writeClassicGeometry(const QString &path, const QString &armSize) const;
     void disableModelRuntimeAndRemoveLocal(const QString &status, bool removeLocalDll);
     void syncStatusFromDll();
     void syncHostUpdateSnapshot(const QString &state, bool authDllPendingReplace = false);
@@ -219,6 +225,7 @@ private:
     bool m_modelRuntimeAvailable = false;
     bool m_modelReplacementRunning = false;
     bool m_modelReplacementRestartPending = false;
+    bool m_classicModeEnabled = false;
     QString m_modelReplacementStatus = "已关闭";
     QString m_skinPngPath;
     int m_skinPngWidth = 0;
