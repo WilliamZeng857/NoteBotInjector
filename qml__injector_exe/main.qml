@@ -1721,60 +1721,38 @@ Window {
                         width: parent.width
                         height: 48
                         radius: 8
-                        color: armLockTap.pressed
-                               ? (backend.modelArmOverrideEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : Qt.rgba(1, 1, 1, 0.085))
-                               : backend.modelArmOverrideEnabled
-                                 ? (armLockHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055))
-                                 : (armLockHover.hovered ? Qt.rgba(1, 1, 1, 0.062) : Qt.rgba(1, 1, 1, 0.025))
+                        color: binding(function() {
+                            if (armLockTap.pressed) return Qt.rgba(0.133, 0.827, 0.933, 0.13);
+                            return armLockHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055);
+                        })
                         border.width: 1
-                        border.color: backend.modelArmOverrideEnabled
-                                      ? (armLockHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.58) : Qt.rgba(0.133, 0.827, 0.933, 0.34))
-                                      : (armLockHover.hovered ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.07))
+                        border.color: armLockHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.58) : Qt.rgba(0.133, 0.827, 0.933, 0.34)
                         scale: armLockTap.pressed ? 0.985 : armLockHover.hovered ? 1.008 : 1
                         Behavior on color { ColorAnimation { duration: 130 } }
                         Behavior on border.color { ColorAnimation { duration: 130 } }
                         Behavior on scale { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
 
                         HoverHandler { id: armLockHover }
-                        TapHandler {
-                            id: armLockTap
-                            onTapped: backend.modelArmOverrideEnabled = !backend.modelArmOverrideEnabled
-                        }
+                        TapHandler { id: armLockTap }
 
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 14
                             anchors.rightMargin: 12
                             spacing: 10
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 2
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: "固定手臂类型"
-                                    color: backend.modelArmOverrideEnabled ? textPrimary : textSecondary
-                                    font.pixelSize: 13
-                                    font.bold: true
-                                    font.family: "Microsoft YaHei UI"
-                                    elide: Text.ElideRight
-                                }
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: backend.modelArmOverrideEnabled ? "On · 对新启动的游戏进程生效" : "Off · 使用游戏默认手臂"
-                                    color: backend.modelArmOverrideEnabled ? accentCyan : textMuted
-                                    font.pixelSize: 10
-                                    font.family: "Microsoft YaHei UI"
-                                    elide: Text.ElideRight
-                                }
-                            }
-
                             Text {
-                                Layout.preferredWidth: 44
-                                text: backend.modelArmOverrideEnabled ? "ON" : "OFF"
-                                color: backend.modelArmOverrideEnabled ? accentCyan : textMuted
+                                Layout.fillWidth: true
+                                text: "手臂类型"
+                                color: textPrimary
+                                font.pixelSize: 13
+                                font.bold: true
+                                font.family: "Microsoft YaHei UI"
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                Layout.preferredWidth: 56
+                                text: backend.modelArmSize === "slim" ? "Alex · 细" : "Steve · 粗"
+                                color: accentCyan
                                 font.pixelSize: 11
                                 font.bold: true
                                 font.family: "Segoe UI"
@@ -1787,8 +1765,8 @@ Window {
                         width: parent.width
                         height: 42
                         spacing: 8
-                        enabled: backend.modelArmOverrideEnabled
-                        opacity: enabled ? 1.0 : 0.45
+                        enabled: true
+                        opacity: 1.0
 
                         Rectangle {
                             width: (parent.width - parent.spacing) / 2

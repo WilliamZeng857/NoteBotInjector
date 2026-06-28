@@ -883,6 +883,7 @@ void Backend::startModelReplacementWait()
     }
     ModelCatalogEntry active;
     const bool classicSkin = m_modelModificationEnabled && m_classicModeEnabled && !m_skinPngPath.isEmpty();
+    const QString arm = effectiveModelArmSize();
     if (m_modelModificationEnabled) {
         if (classicSkin) {
             // Classic square skin: use hardcoded vanilla geometry + user PNG
@@ -902,8 +903,6 @@ void Backend::startModelReplacementWait()
             m_skinPngWidth = size.width();
             m_skinPngHeight = size.height();
             emit skinPngInfoChanged();
-
-            const QString arm = effectiveModelArmSize();
             const QString geomPath = classicGeometryTempPath();
             if (!writeClassicGeometry(geomPath, arm)) {
                 m_logModel->append(QStringLiteral("[MODEL] 无法生成方块人几何文件"));
@@ -939,7 +938,7 @@ void Backend::startModelReplacementWait()
 
     QJsonObject cfg;
     cfg[QStringLiteral("model_enabled")] = m_modelModificationEnabled;
-    cfg[QStringLiteral("arm_override_enabled")] = m_modelArmOverrideEnabled;
+    cfg[QStringLiteral("arm_override_enabled")] = true;
     cfg[QStringLiteral("arm_size")] = effectiveModelArmSize();
     if (m_modelModificationEnabled) {
         cfg[QStringLiteral("geometry_path")] = active.modelFile;
