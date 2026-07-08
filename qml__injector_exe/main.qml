@@ -2097,6 +2097,7 @@ Window {
                     anchors.rightMargin: 4
                     anchors.bottomMargin: 2
                     width: Math.min(360, parent.width - 16)
+                    visible: settingsPageRestored.settingsTab !== 1
                     spacing: 4
 
                     Text {
