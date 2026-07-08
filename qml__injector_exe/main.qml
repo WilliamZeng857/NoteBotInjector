@@ -1526,348 +1526,361 @@ Window {
                 Layout.fillHeight: true
                 visible: mainUI.detailPanel === "settings"
 
-                ScrollView {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    clip: true
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                property int settingsTab: 0
 
-                    GridLayout {
-                        width: settingsPageRestored.width - 16
-                        columns: width >= 720 ? 2 : 1
-                        rowSpacing: 12
-                        columnSpacing: 12
+                Column {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.leftMargin: 12
+                    anchors.topMargin: 10
+                    width: Math.min(440, Math.max(0, parent.width - 24))
+                    spacing: 14
 
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: 420
-                            Layout.minimumWidth: 320
-                            Layout.alignment: Qt.AlignTop
-                            Layout.preferredHeight: 252
-                            radius: 8
-                            color: Qt.rgba(1, 1, 1, 0.026)
-                            border.width: 1
-                            border.color: Qt.rgba(1, 1, 1, 0.07)
+                    Rectangle {
+                        width: parent.width
+                        height: 36
+                        radius: 8
+                        color: Qt.rgba(1, 1, 1, 0.026)
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.075)
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.margins: 4
+                            spacing: 4
+
+                            Rectangle {
+                                width: (parent.width - parent.spacing) / 2
+                                height: parent.height
+                                radius: 6
+                                property bool selected: settingsPageRestored.settingsTab === 0
+                                color: selected ? Qt.rgba(0.133, 0.827, 0.933, 0.14) : skinTabHover.hovered ? Qt.rgba(1, 1, 1, 0.045) : "transparent"
+                                border.width: selected ? 1 : 0
+                                border.color: Qt.rgba(0.133, 0.827, 0.933, 0.42)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "皮肤替换"
+                                    color: parent.selected ? accentCyan : textSecondary
+                                    font.pixelSize: 12
+                                    font.bold: parent.selected
+                                    font.family: "Microsoft YaHei UI"
+                                }
+
+                                HoverHandler { id: skinTabHover }
+                                TapHandler { onTapped: settingsPageRestored.settingsTab = 0 }
+                            }
+
+                            Rectangle {
+                                width: (parent.width - parent.spacing) / 2
+                                height: parent.height
+                                radius: 6
+                                property bool selected: settingsPageRestored.settingsTab === 1
+                                color: selected ? Qt.rgba(0.545, 0.361, 0.965, 0.14) : hotkeyTabHover.hovered ? Qt.rgba(1, 1, 1, 0.045) : "transparent"
+                                border.width: selected ? 1 : 0
+                                border.color: Qt.rgba(0.545, 0.361, 0.965, 0.42)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "快捷键"
+                                    color: parent.selected ? "#DDD6FE" : textSecondary
+                                    font.pixelSize: 12
+                                    font.bold: parent.selected
+                                    font.family: "Microsoft YaHei UI"
+                                }
+
+                                HoverHandler { id: hotkeyTabHover }
+                                TapHandler { onTapped: settingsPageRestored.settingsTab = 1 }
+                            }
+                        }
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: settingsPageRestored.settingsTab === 0 ? skinSettingsContent.implicitHeight : hotkeySettingsContent.implicitHeight
+
+                        Column {
+                            id: skinSettingsContent
+                            visible: settingsPageRestored.settingsTab === 0
+                            width: parent.width
+                            spacing: 10
 
                             Column {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 12
+                                width: parent.width
+                                spacing: 3
 
-                                Column {
+                                Text {
                                     width: parent.width
-                                    spacing: 4
-
-                                    Text {
-                                        width: parent.width
-                                        text: "启动皮肤替换"
-                                        color: textPrimary
-                                        font.pixelSize: 16
-                                        font.bold: true
-                                        font.family: "Microsoft YaHei UI"
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        width: parent.width
-                                        text: backend.classicModeEnabled ? "经典方块人优先" : "服务器立体模型"
-                                        color: backend.classicModeEnabled ? accentCyan : textSecondary
-                                        font.pixelSize: 11
-                                        font.family: "Microsoft YaHei UI"
-                                        elide: Text.ElideRight
-                                    }
+                                    text: "启动皮肤替换"
+                                    color: textPrimary
+                                    font.pixelSize: 16
+                                    font.bold: true
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
                                 }
 
-                                Rectangle {
+                                Text {
                                     width: parent.width
-                                    height: 48
-                                    radius: 8
-                                    color: Qt.rgba(1, 1, 1, 0.035)
-                                    border.width: 1
-                                    border.color: Qt.rgba(1, 1, 1, 0.08)
+                                    text: backend.classicModeEnabled ? "经典方块人优先" : "服务器立体模型"
+                                    color: backend.classicModeEnabled ? accentCyan : textSecondary
+                                    font.pixelSize: 11
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
+                                }
+                            }
 
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 14
-                                        anchors.rightMargin: 12
-                                        spacing: 10
+                            Rectangle {
+                                width: parent.width
+                                height: 44
+                                radius: 8
+                                color: Qt.rgba(1, 1, 1, 0.026)
+                                border.width: 1
+                                border.color: Qt.rgba(1, 1, 1, 0.075)
 
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 2
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 10
+                                    spacing: 10
 
-                                            Text {
-                                                Layout.fillWidth: true
-                                                text: "皮肤 PNG"
-                                                color: textSecondary
-                                                font.pixelSize: 12
-                                                font.bold: true
-                                                font.family: "Microsoft YaHei UI"
-                                                elide: Text.ElideRight
-                                            }
-
-                                            Text {
-                                                Layout.fillWidth: true
-                                                text: backend.skinPngPath === "" ? "未选择" : backend.skinPngPath.split('/').pop().split('\\').pop()
-                                                color: backend.skinPngPath === "" ? textMuted : accentCyan
-                                                font.pixelSize: 10
-                                                font.family: "Microsoft YaHei UI"
-                                                elide: Text.ElideRight
-                                            }
-                                        }
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 1
 
                                         Text {
-                                            visible: backend.skinPngWidth > 0
-                                            Layout.preferredWidth: 56
-                                            text: backend.skinPngWidth + "×" + backend.skinPngHeight
+                                            Layout.fillWidth: true
+                                            text: "皮肤 PNG"
                                             color: textSecondary
-                                            font.pixelSize: 10
-                                            font.family: "Segoe UI"
-                                            horizontalAlignment: Text.AlignRight
-                                        }
-
-                                        Rectangle {
-                                            Layout.preferredWidth: 64
-                                            Layout.preferredHeight: 28
-                                            radius: 6
-                                            color: skinPickerHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.16) : Qt.rgba(1, 1, 1, 0.05)
-                                            border.width: 1
-                                            border.color: skinPickerHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.48) : Qt.rgba(1, 1, 1, 0.12)
-                                            scale: skinPickerTap.pressed ? 0.95 : skinPickerHover.hovered ? 1.04 : 1
-                                            Behavior on color { ColorAnimation { duration: 120 } }
-                                            Behavior on border.color { ColorAnimation { duration: 120 } }
-                                            Behavior on scale { NumberAnimation { duration: 95; easing.type: Easing.OutCubic } }
-
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: "选择"
-                                                color: skinPickerHover.hovered ? accentCyan : textSecondary
-                                                font.pixelSize: 11
-                                                font.bold: true
-                                                font.family: "Microsoft YaHei UI"
-                                            }
-
-                                            HoverHandler { id: skinPickerHover }
-                                            TapHandler {
-                                                id: skinPickerTap
-                                                onTapped: skinFileDialog.open()
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    id: classicModeToggle
-                                    width: parent.width
-                                    height: 48
-                                    radius: 8
-                                    color: classicTap.pressed
-                                           ? (backend.classicModeEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : Qt.rgba(1, 1, 1, 0.085))
-                                           : backend.classicModeEnabled
-                                             ? (classicHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055))
-                                             : (classicHover.hovered ? Qt.rgba(1, 1, 1, 0.062) : Qt.rgba(1, 1, 1, 0.025))
-                                    border.width: 1
-                                    border.color: backend.classicModeEnabled
-                                                  ? (classicHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.58) : Qt.rgba(0.133, 0.827, 0.933, 0.34))
-                                                  : (classicHover.hovered ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.07))
-                                    scale: classicTap.pressed ? 0.985 : classicHover.hovered ? 1.008 : 1
-                                    Behavior on color { ColorAnimation { duration: 130 } }
-                                    Behavior on border.color { ColorAnimation { duration: 130 } }
-                                    Behavior on scale { NumberAnimation { duration: 105; easing.type: Easing.OutCubic } }
-
-                                    HoverHandler { id: classicHover }
-                                    TapHandler {
-                                        id: classicTap
-                                        onTapped: backend.classicModeEnabled = !backend.classicModeEnabled
-                                    }
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 14
-                                        anchors.rightMargin: 12
-                                        spacing: 10
-
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 2
-
-                                            Text {
-                                                Layout.fillWidth: true
-                                                text: "经典方块人覆盖"
-                                                color: backend.classicModeEnabled ? textPrimary : textSecondary
-                                                font.pixelSize: 13
-                                                font.bold: true
-                                                font.family: "Microsoft YaHei UI"
-                                                elide: Text.ElideRight
-                                            }
-
-                                            Text {
-                                                Layout.fillWidth: true
-                                                text: backend.classicModeEnabled ? "On · 方块人皮肤" : "Off · 服务器模型"
-                                                color: backend.classicModeEnabled ? accentCyan : textMuted
-                                                font.pixelSize: 10
-                                                font.family: "Microsoft YaHei UI"
-                                                elide: Text.ElideRight
-                                            }
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            font.family: "Microsoft YaHei UI"
+                                            elide: Text.ElideRight
                                         }
 
                                         Text {
-                                            Layout.preferredWidth: 44
-                                            text: backend.classicModeEnabled ? "ON" : "OFF"
-                                            color: backend.classicModeEnabled ? accentCyan : textMuted
+                                            Layout.fillWidth: true
+                                            text: backend.skinPngPath === "" ? "未选择" : backend.skinPngPath.split('/').pop().split('\\').pop()
+                                            color: backend.skinPngPath === "" ? textMuted : accentCyan
+                                            font.pixelSize: 10
+                                            font.family: "Microsoft YaHei UI"
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: backend.skinPngWidth > 0
+                                        Layout.preferredWidth: 56
+                                        text: backend.skinPngWidth + "×" + backend.skinPngHeight
+                                        color: textSecondary
+                                        font.pixelSize: 10
+                                        font.family: "Segoe UI"
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+
+                                    Rectangle {
+                                        Layout.preferredWidth: 56
+                                        Layout.preferredHeight: 26
+                                        radius: 6
+                                        color: skinPickerHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.16) : Qt.rgba(1, 1, 1, 0.05)
+                                        border.width: 1
+                                        border.color: skinPickerHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.48) : Qt.rgba(1, 1, 1, 0.12)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "选择"
+                                            color: skinPickerHover.hovered ? accentCyan : textSecondary
                                             font.pixelSize: 11
                                             font.bold: true
-                                            font.family: "Segoe UI"
-                                            horizontalAlignment: Text.AlignRight
+                                            font.family: "Microsoft YaHei UI"
+                                        }
+
+                                        HoverHandler { id: skinPickerHover }
+                                        TapHandler {
+                                            id: skinPickerTap
+                                            onTapped: skinFileDialog.open()
                                         }
                                     }
                                 }
+                            }
 
-                                Row {
-                                    width: parent.width
-                                    height: 42
-                                    spacing: 8
-                                    enabled: true
-                                    opacity: 1.0
+                            Rectangle {
+                                id: classicModeToggle
+                                width: parent.width
+                                height: 44
+                                radius: 8
+                                color: classicTap.pressed
+                                       ? (backend.classicModeEnabled ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : Qt.rgba(1, 1, 1, 0.085))
+                                       : backend.classicModeEnabled
+                                         ? (classicHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.10) : Qt.rgba(0.133, 0.827, 0.933, 0.055))
+                                         : (classicHover.hovered ? Qt.rgba(1, 1, 1, 0.062) : Qt.rgba(1, 1, 1, 0.025))
+                                border.width: 1
+                                border.color: backend.classicModeEnabled
+                                              ? (classicHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.58) : Qt.rgba(0.133, 0.827, 0.933, 0.34))
+                                              : (classicHover.hovered ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.07))
 
-                                    Rectangle {
-                                        width: (parent.width - parent.spacing) / 2
-                                        height: parent.height
-                                        radius: 8
-                                        property bool selected: backend.modelArmSize === "slim"
-                                        color: selected ? Qt.rgba(0.545, 0.361, 0.965, 0.16) : Qt.rgba(1, 1, 1, 0.025)
-                                        border.width: 1
-                                        border.color: selected ? Qt.rgba(0.545, 0.361, 0.965, 0.56) : Qt.rgba(1, 1, 1, 0.08)
-                                        Behavior on color { ColorAnimation { duration: 130 } }
-                                        Behavior on border.color { ColorAnimation { duration: 130 } }
+                                HoverHandler { id: classicHover }
+                                TapHandler {
+                                    id: classicTap
+                                    onTapped: backend.classicModeEnabled = !backend.classicModeEnabled
+                                }
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "Alex · 细手臂"
-                                            color: parent.selected ? "#DDD6FE" : textSecondary
-                                            font.pixelSize: 12
-                                            font.bold: true
-                                            font.family: "Microsoft YaHei UI"
-                                        }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 10
+                                    spacing: 10
 
-                                        TapHandler { onTapped: backend.modelArmSize = "slim" }
-                                    }
-
-                                    Rectangle {
-                                        width: (parent.width - parent.spacing) / 2
-                                        height: parent.height
-                                        radius: 8
-                                        property bool selected: backend.modelArmSize === "wide"
-                                        color: selected ? Qt.rgba(0.133, 0.827, 0.933, 0.15) : Qt.rgba(1, 1, 1, 0.025)
-                                        border.width: 1
-                                        border.color: selected ? Qt.rgba(0.133, 0.827, 0.933, 0.52) : Qt.rgba(1, 1, 1, 0.08)
-                                        Behavior on color { ColorAnimation { duration: 130 } }
-                                        Behavior on border.color { ColorAnimation { duration: 130 } }
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 1
 
                                         Text {
-                                            anchors.centerIn: parent
-                                            text: "Steve · 粗手臂"
-                                            color: parent.selected ? "#CFFAFE" : textSecondary
-                                            font.pixelSize: 12
+                                            Layout.fillWidth: true
+                                            text: "经典方块人覆盖"
+                                            color: backend.classicModeEnabled ? textPrimary : textSecondary
+                                            font.pixelSize: 13
                                             font.bold: true
                                             font.family: "Microsoft YaHei UI"
+                                            elide: Text.ElideRight
                                         }
 
-                                        TapHandler { onTapped: backend.modelArmSize = "wide" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: backend.classicModeEnabled ? "On · 方块人皮肤" : "Off · 服务器模型"
+                                            color: backend.classicModeEnabled ? accentCyan : textMuted
+                                            font.pixelSize: 10
+                                            font.family: "Microsoft YaHei UI"
+                                            elide: Text.ElideRight
+                                        }
                                     }
+
+                                    Text {
+                                        Layout.preferredWidth: 44
+                                        text: backend.classicModeEnabled ? "ON" : "OFF"
+                                        color: backend.classicModeEnabled ? accentCyan : textMuted
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        font.family: "Segoe UI"
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 38
+                                spacing: 8
+
+                                Rectangle {
+                                    width: (parent.width - parent.spacing) / 2
+                                    height: parent.height
+                                    radius: 8
+                                    property bool selected: backend.modelArmSize === "slim"
+                                    color: selected ? Qt.rgba(0.545, 0.361, 0.965, 0.16) : Qt.rgba(1, 1, 1, 0.025)
+                                    border.width: 1
+                                    border.color: selected ? Qt.rgba(0.545, 0.361, 0.965, 0.56) : Qt.rgba(1, 1, 1, 0.08)
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Alex · 细手臂"
+                                        color: parent.selected ? "#DDD6FE" : textSecondary
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        font.family: "Microsoft YaHei UI"
+                                    }
+
+                                    TapHandler { onTapped: backend.modelArmSize = "slim" }
+                                }
+
+                                Rectangle {
+                                    width: (parent.width - parent.spacing) / 2
+                                    height: parent.height
+                                    radius: 8
+                                    property bool selected: backend.modelArmSize === "wide"
+                                    color: selected ? Qt.rgba(0.133, 0.827, 0.933, 0.15) : Qt.rgba(1, 1, 1, 0.025)
+                                    border.width: 1
+                                    border.color: selected ? Qt.rgba(0.133, 0.827, 0.933, 0.52) : Qt.rgba(1, 1, 1, 0.08)
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Steve · 粗手臂"
+                                        color: parent.selected ? "#CFFAFE" : textSecondary
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        font.family: "Microsoft YaHei UI"
+                                    }
+
+                                    TapHandler { onTapped: backend.modelArmSize = "wide" }
                                 }
                             }
                         }
 
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: 360
-                            Layout.minimumWidth: 300
-                            Layout.alignment: Qt.AlignTop
-                            Layout.preferredHeight: 252
-                            radius: 8
-                            color: Qt.rgba(1, 1, 1, 0.02)
-                            border.width: 1
-                            border.color: Qt.rgba(1, 1, 1, 0.065)
+                        Column {
+                            id: hotkeySettingsContent
+                            visible: settingsPageRestored.settingsTab === 1
+                            width: parent.width
+                            spacing: 10
 
                             Column {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 12
+                                width: parent.width
+                                spacing: 3
 
-                                Column {
+                                Text {
                                     width: parent.width
-                                    spacing: 4
-
-                                    Text {
-                                        width: parent.width
-                                        text: "快捷键"
-                                        color: textPrimary
-                                        font.pixelSize: 16
-                                        font.bold: true
-                                        font.family: "Microsoft YaHei UI"
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        width: parent.width
-                                        text: "按键绑定"
-                                        color: textSecondary
-                                        font.pixelSize: 11
-                                        font.family: "Microsoft YaHei UI"
-                                        elide: Text.ElideRight
-                                    }
+                                    text: "快捷键"
+                                    color: textPrimary
+                                    font.pixelSize: 16
+                                    font.bold: true
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
                                 }
 
-                                Repeater {
-                                    model: [
-                                        { name: "启动注入", value: "未绑定" },
-                                        { name: "模型替换", value: "未绑定" },
-                                        { name: "日志窗口", value: "未绑定" }
-                                    ]
+                                Text {
+                                    width: parent.width
+                                    text: "后续在这里放按键绑定"
+                                    color: textSecondary
+                                    font.pixelSize: 11
+                                    font.family: "Microsoft YaHei UI"
+                                    elide: Text.ElideRight
+                                }
+                            }
 
-                                    delegate: Rectangle {
-                                        width: parent.width
-                                        height: 42
-                                        radius: 8
-                                        color: shortcutHover.hovered ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(1, 1, 1, 0.026)
-                                        border.width: 1
-                                        border.color: shortcutHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.28) : Qt.rgba(1, 1, 1, 0.075)
+                            Repeater {
+                                model: ["启动注入", "模型替换", "日志窗口"]
 
-                                        HoverHandler { id: shortcutHover }
+                                delegate: Rectangle {
+                                    width: parent.width
+                                    height: 38
+                                    radius: 8
+                                    color: shortcutHover.hovered ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(1, 1, 1, 0.026)
+                                    border.width: 1
+                                    border.color: shortcutHover.hovered ? Qt.rgba(0.545, 0.361, 0.965, 0.28) : Qt.rgba(1, 1, 1, 0.075)
 
-                                        RowLayout {
-                                            anchors.fill: parent
-                                            anchors.leftMargin: 14
-                                            anchors.rightMargin: 12
-                                            spacing: 10
+                                    HoverHandler { id: shortcutHover }
 
-                                            Text {
-                                                Layout.fillWidth: true
-                                                text: modelData.name
-                                                color: textSecondary
-                                                font.pixelSize: 12
-                                                font.bold: true
-                                                font.family: "Microsoft YaHei UI"
-                                                elide: Text.ElideRight
-                                            }
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 10
+                                        spacing: 10
 
-                                            Rectangle {
-                                                Layout.preferredWidth: 72
-                                                Layout.preferredHeight: 24
-                                                radius: 6
-                                                color: Qt.rgba(1, 1, 1, 0.04)
-                                                border.width: 1
-                                                border.color: Qt.rgba(1, 1, 1, 0.09)
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: modelData
+                                            color: textSecondary
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            font.family: "Microsoft YaHei UI"
+                                            elide: Text.ElideRight
+                                        }
 
-                                                Text {
-                                                    anchors.centerIn: parent
-                                                    text: modelData.value
-                                                    color: textMuted
-                                                    font.pixelSize: 10
-                                                    font.family: "Microsoft YaHei UI"
-                                                }
-                                            }
+                                        Text {
+                                            Layout.preferredWidth: 72
+                                            text: "未绑定"
+                                            color: textMuted
+                                            font.pixelSize: 10
+                                            font.family: "Microsoft YaHei UI"
+                                            horizontalAlignment: Text.AlignRight
                                         }
                                     }
                                 }
