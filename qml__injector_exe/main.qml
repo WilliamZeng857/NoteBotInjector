@@ -1534,7 +1534,7 @@ Window {
                     anchors.leftMargin: 12
                     anchors.topMargin: 10
                     width: settingsPageRestored.settingsTab === 1
-                           ? 820
+                           ? Math.min(620, Math.max(0, parent.width - 24))
                            : Math.min(440, Math.max(0, parent.width - 24))
                     spacing: 14
 
@@ -1954,17 +1954,17 @@ Window {
 
                             Rectangle {
                                 id: keyboardPreview
-                                width: 704
-                                height: 190
+                                width: Math.min(596, parent.width)
+                                height: 178
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                radius: 14
-                                color: Qt.rgba(0.020, 0.024, 0.032, 0.82)
+                                radius: 10
+                                color: Qt.rgba(0.012, 0.019, 0.032, 0.72)
                                 border.width: 1
-                                border.color: Qt.rgba(1, 1, 1, 0.15)
+                                border.color: Qt.rgba(0.133, 0.827, 0.933, 0.24)
 
-                                property real keyUnit: 26
-                                property real keyHeight: 23
-                                property real keyGap: 3
+                                property real keyGap: 2
+                                property real keyUnit: Math.min(23, Math.max(10, (width - 31) / 23.05))
+                                property real keyHeight: 21
                                 property var rows: [
                                     [
                                         { label: "Esc", u: 1 }, { spacer: true, u: 0.65 },
@@ -2001,31 +2001,40 @@ Window {
 
                                 Rectangle {
                                     anchors.fill: parent
-                                    anchors.margins: 7
-                                    radius: 10
-                                    color: Qt.rgba(1, 1, 1, 0.025)
+                                    anchors.margins: 6
+                                    radius: 8
+                                    color: Qt.rgba(0.133, 0.827, 0.933, 0.022)
                                     border.width: 1
-                                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                                    border.color: Qt.rgba(0.545, 0.361, 0.965, 0.16)
                                 }
 
                                 Rectangle {
                                     anchors.left: parent.left
                                     anchors.right: parent.right
                                     anchors.top: parent.top
-                                    anchors.margins: 8
-                                    height: 22
-                                    radius: 9
-                                    color: Qt.rgba(1, 1, 1, 0.035)
+                                    anchors.margins: 7
+                                    height: 16
+                                    radius: 7
+                                    color: Qt.rgba(0.133, 0.827, 0.933, 0.050)
                                     border.width: 0
+                                }
+
+                                Rectangle {
+                                    width: parent.width - 22
+                                    height: 1
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.top: parent.top
+                                    anchors.topMargin: 31
+                                    color: Qt.rgba(0.133, 0.827, 0.933, 0.18)
                                 }
 
                                 Column {
                                     id: keyboardRows
-                                    width: 656
+                                    width: Math.min(565, Math.max(0, parent.width - 20))
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     anchors.top: parent.top
-                                    anchors.topMargin: 17
-                                    spacing: 4
+                                    anchors.topMargin: 15
+                                    spacing: 3
 
                                     Repeater {
                                         model: keyboardPreview.rows
@@ -2045,20 +2054,20 @@ Window {
                                                     Rectangle {
                                                         anchors.fill: parent
                                                         visible: !modelData.spacer
-                                                        radius: 5
+                                                        radius: 4
                                                         property bool bound: hotkeySettingsContent.keyBound(modelData.label)
-                                                        color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.155) : keyHover.hovered ? Qt.rgba(1, 1, 1, 0.075) : Qt.rgba(1, 1, 1, 0.038)
+                                                        color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : keyHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.07) : Qt.rgba(1, 1, 1, 0.022)
                                                         border.width: 1
-                                                        border.color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.68) : keyHover.hovered ? Qt.rgba(1, 1, 1, 0.19) : Qt.rgba(1, 1, 1, 0.095)
+                                                        border.color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.64) : keyHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.25) : Qt.rgba(1, 1, 1, 0.075)
 
                                                         Rectangle {
                                                             anchors.left: parent.left
                                                             anchors.right: parent.right
                                                             anchors.top: parent.top
                                                             anchors.margins: 1
-                                                            height: 7
-                                                            radius: 4
-                                                            color: parent.bound ? Qt.rgba(0.133, 0.827, 0.933, 0.12) : Qt.rgba(1, 1, 1, 0.038)
+                                                            height: 2
+                                                            radius: 1
+                                                            color: parent.bound ? Qt.rgba(0.133, 0.827, 0.933, 0.42) : Qt.rgba(1, 1, 1, 0.055)
                                                         }
 
                                                         Text {
@@ -2066,7 +2075,7 @@ Window {
                                                             text: modelData.label
                                                             color: parent.bound ? accentCyan : textSecondary
                                                             font.pixelSize: modelData.label.length > 4 ? 8 : 9
-                                                            font.bold: parent.bound
+                                                            font.bold: false
                                                             font.family: "Segoe UI"
                                                             elide: Text.ElideRight
                                                         }
