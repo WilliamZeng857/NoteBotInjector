@@ -1821,7 +1821,7 @@ Window {
                             id: hotkeySettingsContent
                             visible: settingsPageRestored.settingsTab === 1
                             width: parent.width
-                            spacing: 12
+                            spacing: 8
 
                             property var previewBindings: [
                                 { name: "启动注入", combo: "Ctrl + I", keys: ["Ctrl", "I"], enabled: true },
@@ -2074,7 +2074,7 @@ Window {
 
                             Item {
                                 width: 1
-                                height: 42
+                                height: 12
                             }
                         }
                     }
@@ -2097,7 +2097,6 @@ Window {
                     anchors.rightMargin: 4
                     anchors.bottomMargin: 2
                     width: Math.min(360, parent.width - 16)
-                    visible: settingsPageRestored.settingsTab !== 1
                     spacing: 4
 
                     Text {
