@@ -1534,7 +1534,7 @@ Window {
                     anchors.leftMargin: 12
                     anchors.topMargin: 10
                     width: settingsPageRestored.settingsTab === 1
-                           ? Math.min(860, Math.max(0, parent.width - 24))
+                           ? 820
                            : Math.min(440, Math.max(0, parent.width - 24))
                     spacing: 14
 
@@ -1876,115 +1876,6 @@ Window {
                                 }
                             }
 
-                            Rectangle {
-                                id: keyboardPreview
-                                width: parent.width
-                                height: keyboardRows.implicitHeight + 18
-                                radius: 8
-                                color: Qt.rgba(1, 1, 1, 0.020)
-                                border.width: 1
-                                border.color: Qt.rgba(1, 1, 1, 0.070)
-
-                                property real keyUnit: Math.min(30, Math.max(13, (width - 72) / 27.2))
-                                property real keyHeight: 23
-                                property var rows: [
-                                    [
-                                        { label: "Esc", u: 1 }, { spacer: true, u: 0.65 },
-                                        { label: "F1", u: 1 }, { label: "F2", u: 1 }, { label: "F3", u: 1 }, { label: "F4", u: 1 }, { spacer: true, u: 0.35 },
-                                        { label: "F5", u: 1 }, { label: "F6", u: 1 }, { label: "F7", u: 1 }, { label: "F8", u: 1 }, { spacer: true, u: 0.35 },
-                                        { label: "F9", u: 1 }, { label: "F10", u: 1 }, { label: "F11", u: 1 }, { label: "F12", u: 1 }, { spacer: true, u: 0.55 },
-                                        { label: "Prt", u: 1 }, { label: "Scr", u: 1 }, { label: "Pause", u: 1.25 }
-                                    ],
-                                    [
-                                        { label: "`", u: 1 }, { label: "1", u: 1 }, { label: "2", u: 1 }, { label: "3", u: 1 }, { label: "4", u: 1 }, { label: "5", u: 1 }, { label: "6", u: 1 }, { label: "7", u: 1 }, { label: "8", u: 1 }, { label: "9", u: 1 }, { label: "0", u: 1 }, { label: "-", u: 1 }, { label: "=", u: 1 }, { label: "Back", u: 1.75 }, { spacer: true, u: 0.55 },
-                                        { label: "Ins", u: 1 }, { label: "Home", u: 1 }, { label: "PgUp", u: 1 }, { spacer: true, u: 0.35 },
-                                        { label: "Num", u: 1 }, { label: "/", u: 1 }, { label: "*", u: 1 }, { label: "-", u: 1 }
-                                    ],
-                                    [
-                                        { label: "Tab", u: 1.45 }, { label: "Q", u: 1 }, { label: "W", u: 1 }, { label: "E", u: 1 }, { label: "R", u: 1 }, { label: "T", u: 1 }, { label: "Y", u: 1 }, { label: "U", u: 1 }, { label: "I", u: 1 }, { label: "O", u: 1 }, { label: "P", u: 1 }, { label: "[", u: 1 }, { label: "]", u: 1 }, { label: "\\", u: 1.3 }, { spacer: true, u: 0.55 },
-                                        { label: "Del", u: 1 }, { label: "End", u: 1 }, { label: "PgDn", u: 1 }, { spacer: true, u: 0.35 },
-                                        { label: "7", u: 1 }, { label: "8", u: 1 }, { label: "9", u: 1 }, { label: "+", u: 1 }
-                                    ],
-                                    [
-                                        { label: "Caps", u: 1.72 }, { label: "A", u: 1 }, { label: "S", u: 1 }, { label: "D", u: 1 }, { label: "F", u: 1 }, { label: "G", u: 1 }, { label: "H", u: 1 }, { label: "J", u: 1 }, { label: "K", u: 1 }, { label: "L", u: 1 }, { label: ";", u: 1 }, { label: "'", u: 1 }, { label: "Enter", u: 2.05 }, { spacer: true, u: 4.0 },
-                                        { label: "4", u: 1 }, { label: "5", u: 1 }, { label: "6", u: 1 }, { label: "+", u: 1 }
-                                    ],
-                                    [
-                                        { label: "Shift", u: 2.25 }, { label: "Z", u: 1 }, { label: "X", u: 1 }, { label: "C", u: 1 }, { label: "V", u: 1 }, { label: "B", u: 1 }, { label: "N", u: 1 }, { label: "M", u: 1 }, { label: ",", u: 1 }, { label: ".", u: 1 }, { label: "/", u: 1 }, { label: "Shift", u: 2.35 }, { spacer: true, u: 1.55 },
-                                        { label: "Up", u: 1 }, { spacer: true, u: 1.35 },
-                                        { label: "1", u: 1 }, { label: "2", u: 1 }, { label: "3", u: 1 }, { label: "Enter", u: 1 }
-                                    ],
-                                    [
-                                        { label: "Ctrl", u: 1.35 }, { label: "Win", u: 1.2 }, { label: "Alt", u: 1.25 }, { label: "Space", u: 6.2 }, { label: "Alt", u: 1.25 }, { label: "Fn", u: 1.15 }, { label: "Menu", u: 1.25 }, { label: "Ctrl", u: 1.35 }, { spacer: true, u: 0.65 },
-                                        { label: "Left", u: 1 }, { label: "Down", u: 1 }, { label: "Right", u: 1 }, { spacer: true, u: 0.35 },
-                                        { label: "0", u: 2.05 }, { label: ".", u: 1 }, { label: "Enter", u: 1 }
-                                    ]
-                                ]
-
-                                Column {
-                                    id: keyboardRows
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.margins: 9
-                                    spacing: 4
-
-                                    Repeater {
-                                        model: keyboardPreview.rows
-
-                                        delegate: Row {
-                                            width: parent.width
-                                            height: keyboardPreview.keyHeight
-                                            spacing: 3
-                                            property var rowKeys: modelData
-
-                                            Repeater {
-                                                model: rowKeys
-
-                                                delegate: Item {
-                                                    width: keyboardPreview.keyUnit * modelData.u
-                                                    height: keyboardPreview.keyHeight
-
-                                                    Rectangle {
-                                                        anchors.fill: parent
-                                                        visible: !modelData.spacer
-                                                        radius: 4
-                                                        property bool bound: hotkeySettingsContent.keyBound(modelData.label)
-                                                        color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.135) : keyHover.hovered ? Qt.rgba(1, 1, 1, 0.060) : Qt.rgba(1, 1, 1, 0.030)
-                                                        border.width: 1
-                                                        border.color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.62) : keyHover.hovered ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.075)
-
-                                                        Text {
-                                                            anchors.centerIn: parent
-                                                            text: modelData.label
-                                                            color: parent.bound ? accentCyan : textSecondary
-                                                            font.pixelSize: modelData.label.length > 4 ? 8 : 9
-                                                            font.bold: parent.bound
-                                                            font.family: "Segoe UI"
-                                                            elide: Text.ElideRight
-                                                        }
-
-                                                        Rectangle {
-                                                            visible: parent.bound
-                                                            width: 4
-                                                            height: 4
-                                                            radius: 2
-                                                            anchors.right: parent.right
-                                                            anchors.top: parent.top
-                                                            anchors.rightMargin: 3
-                                                            anchors.topMargin: 3
-                                                            color: accentCyan
-                                                        }
-
-                                                        HoverHandler { id: keyHover }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
                             Row {
                                 width: parent.width
                                 height: 24
@@ -2012,6 +1903,11 @@ Window {
                                         }
                                     }
                                 }
+                            }
+
+                            Item {
+                                width: 1
+                                height: 8
                             }
 
                             Repeater {
@@ -2054,6 +1950,151 @@ Window {
                                         }
                                     }
                                 }
+                            }
+
+                            Rectangle {
+                                id: keyboardPreview
+                                width: 704
+                                height: 190
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                radius: 14
+                                color: Qt.rgba(0.020, 0.024, 0.032, 0.82)
+                                border.width: 1
+                                border.color: Qt.rgba(1, 1, 1, 0.15)
+
+                                property real keyUnit: 26
+                                property real keyHeight: 23
+                                property real keyGap: 3
+                                property var rows: [
+                                    [
+                                        { label: "Esc", u: 1 }, { spacer: true, u: 0.65 },
+                                        { label: "F1", u: 1 }, { label: "F2", u: 1 }, { label: "F3", u: 1 }, { label: "F4", u: 1 }, { spacer: true, u: 0.35 },
+                                        { label: "F5", u: 1 }, { label: "F6", u: 1 }, { label: "F7", u: 1 }, { label: "F8", u: 1 }, { spacer: true, u: 0.35 },
+                                        { label: "F9", u: 1 }, { label: "F10", u: 1 }, { label: "F11", u: 1 }, { label: "F12", u: 1 }, { spacer: true, u: 0.55 },
+                                        { label: "Prt", u: 1 }, { label: "Scr", u: 1 }, { label: "Pause", u: 1.25 }
+                                    ],
+                                    [
+                                        { label: "`", u: 1 }, { label: "1", u: 1 }, { label: "2", u: 1 }, { label: "3", u: 1 }, { label: "4", u: 1 }, { label: "5", u: 1 }, { label: "6", u: 1 }, { label: "7", u: 1 }, { label: "8", u: 1 }, { label: "9", u: 1 }, { label: "0", u: 1 }, { label: "-", u: 1 }, { label: "=", u: 1 }, { label: "Back", u: 1.75 }, { spacer: true, u: 0.55 },
+                                        { label: "Ins", u: 1 }, { label: "Home", u: 1 }, { label: "PgUp", u: 1 }, { spacer: true, u: 0.35 },
+                                        { label: "Num", u: 1 }, { label: "/", u: 1 }, { label: "*", u: 1 }, { label: "-", u: 1 }
+                                    ],
+                                    [
+                                        { label: "Tab", u: 1.45 }, { label: "Q", u: 1 }, { label: "W", u: 1 }, { label: "E", u: 1 }, { label: "R", u: 1 }, { label: "T", u: 1 }, { label: "Y", u: 1 }, { label: "U", u: 1 }, { label: "I", u: 1 }, { label: "O", u: 1 }, { label: "P", u: 1 }, { label: "[", u: 1 }, { label: "]", u: 1 }, { label: "\\", u: 1.3 }, { spacer: true, u: 0.55 },
+                                        { label: "Del", u: 1 }, { label: "End", u: 1 }, { label: "PgDn", u: 1 }, { spacer: true, u: 0.35 },
+                                        { label: "7", u: 1 }, { label: "8", u: 1 }, { label: "9", u: 1 }, { label: "+", u: 1 }
+                                    ],
+                                    [
+                                        { label: "Caps", u: 1.72 }, { label: "A", u: 1 }, { label: "S", u: 1 }, { label: "D", u: 1 }, { label: "F", u: 1 }, { label: "G", u: 1 }, { label: "H", u: 1 }, { label: "J", u: 1 }, { label: "K", u: 1 }, { label: "L", u: 1 }, { label: ";", u: 1 }, { label: "'", u: 1 }, { label: "Enter", u: 2.05 }, { spacer: true, u: 4.0 },
+                                        { label: "4", u: 1 }, { label: "5", u: 1 }, { label: "6", u: 1 }, { label: "+", u: 1 }
+                                    ],
+                                    [
+                                        { label: "Shift", u: 2.25 }, { label: "Z", u: 1 }, { label: "X", u: 1 }, { label: "C", u: 1 }, { label: "V", u: 1 }, { label: "B", u: 1 }, { label: "N", u: 1 }, { label: "M", u: 1 }, { label: ",", u: 1 }, { label: ".", u: 1 }, { label: "/", u: 1 }, { label: "Shift", u: 2.35 }, { spacer: true, u: 1.55 },
+                                        { label: "Up", u: 1 }, { spacer: true, u: 1.35 },
+                                        { label: "1", u: 1 }, { label: "2", u: 1 }, { label: "3", u: 1 }, { label: "Enter", u: 1 }
+                                    ],
+                                    [
+                                        { label: "Ctrl", u: 1.35 }, { label: "Win", u: 1.2 }, { label: "Alt", u: 1.25 }, { label: "Space", u: 6.2 }, { label: "Alt", u: 1.25 }, { label: "Fn", u: 1.15 }, { label: "Menu", u: 1.25 }, { label: "Ctrl", u: 1.35 }, { spacer: true, u: 0.65 },
+                                        { label: "Left", u: 1 }, { label: "Down", u: 1 }, { label: "Right", u: 1 }, { spacer: true, u: 0.35 },
+                                        { label: "0", u: 2.05 }, { label: ".", u: 1 }, { label: "Enter", u: 1 }
+                                    ]
+                                ]
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    radius: 10
+                                    color: Qt.rgba(1, 1, 1, 0.025)
+                                    border.width: 1
+                                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                                }
+
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    anchors.margins: 8
+                                    height: 22
+                                    radius: 9
+                                    color: Qt.rgba(1, 1, 1, 0.035)
+                                    border.width: 0
+                                }
+
+                                Column {
+                                    id: keyboardRows
+                                    width: 656
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.top: parent.top
+                                    anchors.topMargin: 17
+                                    spacing: 4
+
+                                    Repeater {
+                                        model: keyboardPreview.rows
+
+                                        delegate: Row {
+                                            height: keyboardPreview.keyHeight
+                                            spacing: keyboardPreview.keyGap
+                                            property var rowKeys: modelData
+
+                                            Repeater {
+                                                model: rowKeys
+
+                                                delegate: Item {
+                                                    width: keyboardPreview.keyUnit * modelData.u
+                                                    height: keyboardPreview.keyHeight
+
+                                                    Rectangle {
+                                                        anchors.fill: parent
+                                                        visible: !modelData.spacer
+                                                        radius: 5
+                                                        property bool bound: hotkeySettingsContent.keyBound(modelData.label)
+                                                        color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.155) : keyHover.hovered ? Qt.rgba(1, 1, 1, 0.075) : Qt.rgba(1, 1, 1, 0.038)
+                                                        border.width: 1
+                                                        border.color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.68) : keyHover.hovered ? Qt.rgba(1, 1, 1, 0.19) : Qt.rgba(1, 1, 1, 0.095)
+
+                                                        Rectangle {
+                                                            anchors.left: parent.left
+                                                            anchors.right: parent.right
+                                                            anchors.top: parent.top
+                                                            anchors.margins: 1
+                                                            height: 7
+                                                            radius: 4
+                                                            color: parent.bound ? Qt.rgba(0.133, 0.827, 0.933, 0.12) : Qt.rgba(1, 1, 1, 0.038)
+                                                        }
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: modelData.label
+                                                            color: parent.bound ? accentCyan : textSecondary
+                                                            font.pixelSize: modelData.label.length > 4 ? 8 : 9
+                                                            font.bold: parent.bound
+                                                            font.family: "Segoe UI"
+                                                            elide: Text.ElideRight
+                                                        }
+
+                                                        Rectangle {
+                                                            visible: parent.bound
+                                                            width: 4
+                                                            height: 4
+                                                            radius: 2
+                                                            anchors.right: parent.right
+                                                            anchors.top: parent.top
+                                                            anchors.rightMargin: 3
+                                                            anchors.topMargin: 3
+                                                            color: accentCyan
+                                                        }
+
+                                                        HoverHandler { id: keyHover }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Item {
+                                width: 1
+                                height: 42
                             }
                         }
                     }
