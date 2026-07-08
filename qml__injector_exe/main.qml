@@ -1958,12 +1958,13 @@ Window {
                                 height: 178
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 radius: 10
-                                color: Qt.rgba(0.012, 0.019, 0.032, 0.72)
+                                color: Qt.rgba(1, 1, 1, 0.018)
                                 border.width: 1
-                                border.color: Qt.rgba(0.133, 0.827, 0.933, 0.24)
+                                border.color: Qt.rgba(1, 1, 1, 0.105)
 
                                 property real keyGap: 2
-                                property real keyUnit: Math.min(23, Math.max(10, (width - 31) / 23.05))
+                                property real keyRowsWidth: Math.min(565, Math.max(0, width - 20))
+                                property real keyUnit: Math.min(23, Math.max(3, Math.min((keyRowsWidth - 44) / 22.65, (keyRowsWidth - 30) / 23.05)))
                                 property real keyHeight: 21
                                 property var rows: [
                                     [
@@ -2003,34 +2004,14 @@ Window {
                                     anchors.fill: parent
                                     anchors.margins: 6
                                     radius: 8
-                                    color: Qt.rgba(0.133, 0.827, 0.933, 0.022)
+                                    color: "transparent"
                                     border.width: 1
-                                    border.color: Qt.rgba(0.545, 0.361, 0.965, 0.16)
-                                }
-
-                                Rectangle {
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.margins: 7
-                                    height: 16
-                                    radius: 7
-                                    color: Qt.rgba(0.133, 0.827, 0.933, 0.050)
-                                    border.width: 0
-                                }
-
-                                Rectangle {
-                                    width: parent.width - 22
-                                    height: 1
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.top: parent.top
-                                    anchors.topMargin: 31
-                                    color: Qt.rgba(0.133, 0.827, 0.933, 0.18)
+                                    border.color: Qt.rgba(1, 1, 1, 0.050)
                                 }
 
                                 Column {
                                     id: keyboardRows
-                                    width: Math.min(565, Math.max(0, parent.width - 20))
+                                    width: keyboardPreview.keyRowsWidth
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     anchors.top: parent.top
                                     anchors.topMargin: 15
@@ -2056,19 +2037,9 @@ Window {
                                                         visible: !modelData.spacer
                                                         radius: 4
                                                         property bool bound: hotkeySettingsContent.keyBound(modelData.label)
-                                                        color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.13) : keyHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.07) : Qt.rgba(1, 1, 1, 0.022)
+                                                        color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.12) : keyHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.055) : Qt.rgba(1, 1, 1, 0.024)
                                                         border.width: 1
-                                                        border.color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.64) : keyHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.25) : Qt.rgba(1, 1, 1, 0.075)
-
-                                                        Rectangle {
-                                                            anchors.left: parent.left
-                                                            anchors.right: parent.right
-                                                            anchors.top: parent.top
-                                                            anchors.margins: 1
-                                                            height: 2
-                                                            radius: 1
-                                                            color: parent.bound ? Qt.rgba(0.133, 0.827, 0.933, 0.42) : Qt.rgba(1, 1, 1, 0.055)
-                                                        }
+                                                        border.color: bound ? Qt.rgba(0.133, 0.827, 0.933, 0.60) : keyHover.hovered ? Qt.rgba(0.133, 0.827, 0.933, 0.22) : Qt.rgba(1, 1, 1, 0.070)
 
                                                         Text {
                                                             anchors.centerIn: parent
