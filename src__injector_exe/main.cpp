@@ -1,4 +1,6 @@
 #include <QGuiApplication>
+#include <QAbstractNativeEventFilter>
+#include <QCoreApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QFont>
@@ -14,8 +16,10 @@
 #include <QTextStream>
 #include <QDateTime>
 #include <QtMessageHandler>
+#include <QTimer>
 #include <windows.h>
 #include <shellapi.h>
+#include <cmath>
 #include "processmodel.h"
 #include "logmodel.h"
 #include "backend.h"
@@ -23,6 +27,189 @@
 #include "modelpreviewitem.h"
 
 static QFile *g_logFile = nullptr;
+
+class AspectRatioWindowGuard final : public QObject, public QAbstractNativeEventFilter
+{
+public:
+    explicit AspectRatioWindowGuard(QWindow *window)
+        : QObject(window)
+        , m_window(window)
+    {
+        if (m_window) {
+            m_window->setMinimumSize(QSize(kMinWidth, kMinHeight));
+            m_hwnd = reinterpret_cast<HWND>(m_window->winId());
+            if (QCoreApplication::instance()) {
+                QCoreApplication::instance()->installNativeEventFilter(this);
+            }
+            connect(m_window, &QWindow::widthChanged, this, [this]() {
+                scheduleAdjust();
+            });
+            connect(m_window, &QWindow::heightChanged, this, [this]() {
+                scheduleAdjust();
+            });
+        }
+    }
+
+    ~AspectRatioWindowGuard() override
+    {
+        if (QCoreApplication::instance()) {
+            QCoreApplication::instance()->removeNativeEventFilter(this);
+        }
+    }
+
+    bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result) override
+    {
+        if ((eventType != "windows_generic_MSG" && eventType != "windows_dispatcher_MSG") || !message || !m_hwnd) {
+            return false;
+        }
+
+        MSG *msg = static_cast<MSG *>(message);
+        if (msg->hwnd != m_hwnd || m_adjusting) {
+            return false;
+        }
+
+        if (msg->message == WM_SIZING) {
+            adjustSizingRect(static_cast<UINT>(msg->wParam), reinterpret_cast<RECT *>(msg->lParam));
+            if (result) {
+                *result = TRUE;
+            }
+            return true;
+        }
+
+        if (msg->message == WM_SIZE || msg->message == WM_WINDOWPOSCHANGED) {
+            scheduleAdjust();
+        }
+        return false;
+    }
+
+private:
+    static constexpr int kMinWidth = 840;
+    static constexpr int kMinHeight = 560;
+    static constexpr double kAspect = 1.5;
+
+    static int maxInt(int a, int b)
+    {
+        return a > b ? a : b;
+    }
+
+    void scheduleAdjust()
+    {
+        if (!m_window || m_adjusting || m_pendingAdjust) {
+            return;
+        }
+
+        m_pendingAdjust = true;
+        QTimer::singleShot(0, this, [this]() {
+            m_pendingAdjust = false;
+            adjustToAspect(m_window ? m_window->size() : QSize());
+        });
+    }
+
+    QSize nativeClientSize() const
+    {
+        RECT clientRect {};
+        if (!m_hwnd || !GetClientRect(m_hwnd, &clientRect)) {
+            return {};
+        }
+        return QSize(clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);
+    }
+
+    QSize frameDelta() const
+    {
+        RECT windowRect {};
+        RECT clientRect {};
+        if (!m_hwnd || !GetWindowRect(m_hwnd, &windowRect) || !GetClientRect(m_hwnd, &clientRect)) {
+            return {};
+        }
+
+        const int outerWidth = windowRect.right - windowRect.left;
+        const int outerHeight = windowRect.bottom - windowRect.top;
+        const int clientWidth = clientRect.right - clientRect.left;
+        const int clientHeight = clientRect.bottom - clientRect.top;
+        return QSize(maxInt(0, outerWidth - clientWidth), maxInt(0, outerHeight - clientHeight));
+    }
+
+    QSize targetClientSize(const QSize &sourceSize) const
+    {
+        if (sourceSize.isEmpty()) {
+            return QSize(kMinWidth, kMinHeight);
+        }
+
+        int targetWidth = maxInt(kMinWidth, sourceSize.width());
+        int targetHeight = maxInt(kMinHeight, sourceSize.height());
+        const double currentAspect = static_cast<double>(targetWidth) / targetHeight;
+
+        if (currentAspect >= kAspect) {
+            targetHeight = static_cast<int>(std::round(targetWidth / kAspect));
+        } else {
+            targetWidth = static_cast<int>(std::round(targetHeight * kAspect));
+        }
+
+        if (targetWidth < kMinWidth || targetHeight < kMinHeight) {
+            return QSize(kMinWidth, kMinHeight);
+        }
+        return QSize(targetWidth, targetHeight);
+    }
+
+    void adjustSizingRect(UINT edge, RECT *rect) const
+    {
+        if (!rect) {
+            return;
+        }
+
+        const QSize frame = frameDelta();
+        const int outerWidth = rect->right - rect->left;
+        const int outerHeight = rect->bottom - rect->top;
+        const QSize clientTarget = targetClientSize(QSize(outerWidth - frame.width(), outerHeight - frame.height()));
+        const int targetOuterWidth = clientTarget.width() + frame.width();
+        const int targetOuterHeight = clientTarget.height() + frame.height();
+
+        const bool leftAnchored = edge == WMSZ_LEFT || edge == WMSZ_TOPLEFT || edge == WMSZ_BOTTOMLEFT;
+        const bool topAnchored = edge == WMSZ_TOP || edge == WMSZ_TOPLEFT || edge == WMSZ_TOPRIGHT;
+
+        if (leftAnchored) {
+            rect->left = rect->right - targetOuterWidth;
+        } else {
+            rect->right = rect->left + targetOuterWidth;
+        }
+
+        if (topAnchored) {
+            rect->top = rect->bottom - targetOuterHeight;
+        } else {
+            rect->bottom = rect->top + targetOuterHeight;
+        }
+    }
+
+    void adjustToAspect(const QSize &newSize)
+    {
+        if (!m_window || m_adjusting || newSize.isEmpty()) {
+            return;
+        }
+
+        const QSize currentClientSize = nativeClientSize();
+        const QSize clientTarget = targetClientSize(currentClientSize.isEmpty() ? newSize : currentClientSize);
+
+        if (currentClientSize == clientTarget) {
+            return;
+        }
+
+        m_adjusting = true;
+        const QSize frame = frameDelta();
+        SetWindowPos(m_hwnd,
+                     nullptr,
+                     0,
+                     0,
+                     clientTarget.width() + frame.width(),
+                     clientTarget.height() + frame.height(),
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        m_adjusting = false;
+    }
+
+    QWindow *m_window = nullptr;
+    HWND m_hwnd = nullptr;
+    bool m_adjusting = false;
+    bool m_pendingAdjust = false;
+};
 
 void logHandler(QtMsgType type, const QMessageLogContext &ctx, const QString &msg)
 {
@@ -144,6 +331,11 @@ int main(int argc, char *argv[])
         return 1;
     }
     qInfo() << "QML loaded successfully, rootObjects count:" << engine.rootObjects().size();
+    if (auto *rootWindow = qobject_cast<QWindow *>(engine.rootObjects().constFirst())) {
+        new AspectRatioWindowGuard(rootWindow);
+    } else {
+        qWarning() << "QML root object is not a QWindow; aspect ratio guard not installed";
+    }
 
     // 窗口显示后，异步执行初始化（本地验证 + 更新检查）
     // singleShot 让 QML 先渲染一次窗口，实际延迟在 initializeAsync() 内部控制

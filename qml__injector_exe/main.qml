@@ -10,7 +10,7 @@ Window {
     visible: true
     width: 960
     height: 640
-    minimumWidth: 860
+    minimumWidth: 840
     minimumHeight: 560
     title: "NoteBot Injector"
     color: "#08080C"
