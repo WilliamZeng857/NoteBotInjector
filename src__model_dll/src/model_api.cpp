@@ -863,7 +863,7 @@ std::vector<HookDef> selectedHooks(const PayloadConfig &cfg)
             include = cfg.modelEnabled && !cfg.animationData.isEmpty();
             break;
         case HookKind::ArmSize:
-            include = (cfg.modelEnabled || cfg.armOverrideEnabled) && !cfg.armSize.isEmpty();
+            include = cfg.armOverrideEnabled && !cfg.armSize.isEmpty();
             break;
         case HookKind::Bool:
             include = cfg.modelEnabled;

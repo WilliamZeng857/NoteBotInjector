@@ -583,7 +583,8 @@ Backend::Backend(ProcessModel *procModel,
     QSettings settings("NoteBot", "Injector");
     m_licenseKey = settings.value("licenseKey").toString();
     m_modelModificationEnabled = settings.value(QStringLiteral("modelModificationEnabled"), false).toBool();
-    m_modelArmOverrideEnabled = settings.value(QStringLiteral("modelArmOverrideEnabled"), false).toBool();
+    m_modelArmOverrideEnabled = false;
+    settings.remove(QStringLiteral("modelArmOverrideEnabled"));
     m_modelArmSize = normalizeModelArmSize(settings.value(QStringLiteral("modelArmSize"), QStringLiteral("slim")).toString());
     m_skinPngPath = settings.value(QStringLiteral("skinPngPath")).toString();
     m_classicModeEnabled = settings.value(QStringLiteral("classicModeEnabled"), false).toBool();
@@ -805,36 +806,14 @@ void Backend::setModelModificationEnabled(bool enabled)
 
 void Backend::setModelArmOverrideEnabled(bool enabled)
 {
-    if (enabled && !m_modelRuntimeAvailable) {
-        setModelReplacementStatus(QStringLiteral("不可用"));
-        m_logModel->append(QStringLiteral("[MODEL] 手臂固定需要模型运行时授权"));
-        return;
-    }
-    if (m_modelArmOverrideEnabled == enabled) {
-        return;
-    }
-    m_modelArmOverrideEnabled = enabled;
     QSettings settings(QStringLiteral("NoteBot"), QStringLiteral("Injector"));
-    settings.setValue(QStringLiteral("modelArmOverrideEnabled"), enabled);
-    emit modelArmOverrideEnabledChanged();
-
-    if (enabled) {
-        m_logModel->append(QStringLiteral("[MODEL] 手臂固定已启用：%1")
-                               .arg(modelArmSizeLabel(m_modelArmSize)));
-        if (m_authSessionVerified) {
-            requestModelReplacementRestart();
-        } else {
-            setModelReplacementStatus(QStringLiteral("等待密钥验证"));
-        }
-    } else {
-        m_logModel->append(QStringLiteral("[MODEL] 手臂固定已关闭"));
-        if (modelRuntimeRequested()) {
-            requestModelReplacementRestart();
-        } else {
-            stopModelReplacementWait();
-            setModelReplacementStatus(QStringLiteral("已关闭"));
-        }
+    settings.remove(QStringLiteral("modelArmOverrideEnabled"));
+    Q_UNUSED(enabled);
+    if (!m_modelArmOverrideEnabled) {
+        return;
     }
+    m_modelArmOverrideEnabled = false;
+    emit modelArmOverrideEnabledChanged();
 }
 
 void Backend::setModelArmSize(const QString &size)
@@ -848,8 +827,8 @@ void Backend::setModelArmSize(const QString &size)
     settings.setValue(QStringLiteral("modelArmSize"), normalized);
     emit modelArmSizeChanged();
 
-    if (m_modelArmOverrideEnabled) {
-        m_logModel->append(QStringLiteral("[MODEL] 手臂固定切换为：%1")
+    if (m_modelModificationEnabled && m_classicModeEnabled) {
+        m_logModel->append(QStringLiteral("[MODEL] 经典方块人手臂切换为：%1")
                                .arg(modelArmSizeLabel(m_modelArmSize)));
         requestModelReplacementRestart();
     }
@@ -882,11 +861,16 @@ void Backend::startModelReplacementWait()
         return;
     }
     ModelCatalogEntry active;
-    const bool classicSkin = m_modelModificationEnabled && m_classicModeEnabled && !m_skinPngPath.isEmpty();
+    const bool classicSkin = m_modelModificationEnabled && m_classicModeEnabled;
     const QString arm = effectiveModelArmSize();
     if (m_modelModificationEnabled) {
         if (classicSkin) {
             // Classic square skin: use hardcoded vanilla geometry + user PNG
+            if (m_skinPngPath.isEmpty()) {
+                m_logModel->append(QStringLiteral("[MODEL] 经典方块人覆盖已开启，请先选择皮肤 PNG"));
+                setModelReplacementStatus(QStringLiteral("等待选择皮肤文件"));
+                return;
+            }
             QImage png(m_skinPngPath);
             if (png.isNull()) {
                 m_logModel->append(QStringLiteral("[MODEL] 皮肤 PNG 无法读取，请重新选择"));
@@ -938,7 +922,7 @@ void Backend::startModelReplacementWait()
 
     QJsonObject cfg;
     cfg[QStringLiteral("model_enabled")] = m_modelModificationEnabled;
-    cfg[QStringLiteral("arm_override_enabled")] = true;
+    cfg[QStringLiteral("arm_override_enabled")] = m_modelModificationEnabled && m_classicModeEnabled;
     cfg[QStringLiteral("arm_size")] = effectiveModelArmSize();
     if (m_modelModificationEnabled) {
         cfg[QStringLiteral("geometry_path")] = active.modelFile;
@@ -959,10 +943,7 @@ void Backend::startModelReplacementWait()
         m_modelReplacementRestartPending = false;
         setModelReplacementRunning(true);
         setModelReplacementStatus(QStringLiteral("正在运行"));
-        const QString targetLabel = m_modelModificationEnabled
-            ? active.name
-            : QStringLiteral("Arm Lock %1").arg(modelArmSizeLabel(m_modelArmSize));
-        m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(targetLabel));
+        m_logModel->append(QStringLiteral("[MODEL] 开始等待下次 Minecraft 启动：%1").arg(active.name));
     } else if (rc == 2) {
         setModelReplacementRunning(true);
         m_logModel->append(QStringLiteral("[MODEL] 当前已经在等待下次启动"));
@@ -1602,14 +1583,12 @@ void Backend::setModelReplacementStatus(const QString &status)
 
 bool Backend::modelRuntimeRequested() const
 {
-    return m_modelModificationEnabled || m_modelArmOverrideEnabled;
+    return m_modelModificationEnabled;
 }
 
 QString Backend::effectiveModelArmSize() const
 {
-    return m_modelArmOverrideEnabled
-        ? normalizeModelArmSize(m_modelArmSize)
-        : QStringLiteral("slim");
+    return normalizeModelArmSize(m_modelArmSize);
 }
 
 QString Backend::effectiveClassicSkinId() const
