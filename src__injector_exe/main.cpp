@@ -1,5 +1,4 @@
 #include <QGuiApplication>
-#include <QAbstractNativeEventFilter>
 #include <QCoreApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -28,7 +27,7 @@
 
 static QFile *g_logFile = nullptr;
 
-class AspectRatioWindowGuard final : public QObject, public QAbstractNativeEventFilter
+class AspectRatioWindowGuard final : public QObject
 {
 public:
     explicit AspectRatioWindowGuard(QWindow *window)
@@ -38,9 +37,7 @@ public:
         if (m_window) {
             m_window->setMinimumSize(QSize(kMinWidth, kMinHeight));
             m_hwnd = reinterpret_cast<HWND>(m_window->winId());
-            if (QCoreApplication::instance()) {
-                QCoreApplication::instance()->installNativeEventFilter(this);
-            }
+            installWindowProc();
             connect(m_window, &QWindow::widthChanged, this, [this]() {
                 scheduleAdjust();
             });
@@ -52,40 +49,75 @@ public:
 
     ~AspectRatioWindowGuard() override
     {
-        if (QCoreApplication::instance()) {
-            QCoreApplication::instance()->removeNativeEventFilter(this);
-        }
-    }
-
-    bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result) override
-    {
-        if ((eventType != "windows_generic_MSG" && eventType != "windows_dispatcher_MSG") || !message || !m_hwnd) {
-            return false;
-        }
-
-        MSG *msg = static_cast<MSG *>(message);
-        if (msg->hwnd != m_hwnd || m_adjusting) {
-            return false;
-        }
-
-        if (msg->message == WM_SIZING) {
-            adjustSizingRect(static_cast<UINT>(msg->wParam), reinterpret_cast<RECT *>(msg->lParam));
-            if (result) {
-                *result = TRUE;
+        if (m_hwnd && IsWindow(m_hwnd)) {
+            if (m_subclassed && reinterpret_cast<WNDPROC>(GetWindowLongPtrW(m_hwnd, GWLP_WNDPROC)) == &AspectRatioWindowGuard::windowProc) {
+                SetWindowLongPtrW(m_hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(m_originalWndProc));
             }
-            return true;
+            RemovePropW(m_hwnd, guardPropertyName());
         }
-
-        if (msg->message == WM_SIZE || msg->message == WM_WINDOWPOSCHANGED) {
-            scheduleAdjust();
-        }
-        return false;
     }
 
 private:
     static constexpr int kMinWidth = 840;
     static constexpr int kMinHeight = 560;
     static constexpr double kAspect = 1.5;
+
+    static const wchar_t *guardPropertyName()
+    {
+        return L"NoteBotAspectRatioWindowGuard";
+    }
+
+    static LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        auto *guard = reinterpret_cast<AspectRatioWindowGuard *>(GetPropW(hwnd, guardPropertyName()));
+        if (!guard) {
+            return DefWindowProcW(hwnd, message, wParam, lParam);
+        }
+        return guard->handleWindowMessage(hwnd, message, wParam, lParam);
+    }
+
+    void installWindowProc()
+    {
+        if (!m_hwnd || !IsWindow(m_hwnd)) {
+            return;
+        }
+
+        SetPropW(m_hwnd, guardPropertyName(), reinterpret_cast<HANDLE>(this));
+        SetLastError(0);
+        const LONG_PTR previous = SetWindowLongPtrW(m_hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&AspectRatioWindowGuard::windowProc));
+        if (previous) {
+            m_originalWndProc = reinterpret_cast<WNDPROC>(previous);
+            m_subclassed = true;
+        } else {
+            RemovePropW(m_hwnd, guardPropertyName());
+        }
+    }
+
+    LRESULT handleWindowMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        if (hwnd != m_hwnd || m_adjusting) {
+            return callOriginal(hwnd, message, wParam, lParam);
+        }
+
+        if (message == WM_SIZING) {
+            adjustSizingRect(static_cast<UINT>(wParam), reinterpret_cast<RECT *>(lParam));
+            return TRUE;
+        }
+
+        const LRESULT result = callOriginal(hwnd, message, wParam, lParam);
+        if (message == WM_SIZE || message == WM_WINDOWPOSCHANGED) {
+            scheduleAdjust();
+        }
+        return result;
+    }
+
+    LRESULT callOriginal(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) const
+    {
+        if (m_originalWndProc) {
+            return CallWindowProcW(m_originalWndProc, hwnd, message, wParam, lParam);
+        }
+        return DefWindowProcW(hwnd, message, wParam, lParam);
+    }
 
     static int maxInt(int a, int b)
     {
@@ -151,6 +183,38 @@ private:
         return QSize(targetWidth, targetHeight);
     }
 
+    QSize targetClientSizeForSizingEdge(UINT edge, const QSize &sourceSize) const
+    {
+        int targetWidth = maxInt(kMinWidth, sourceSize.width());
+        int targetHeight = maxInt(kMinHeight, sourceSize.height());
+
+        const auto fromWidth = [this](int width) {
+            const int clampedWidth = maxInt(kMinWidth, width);
+            return QSize(clampedWidth, maxInt(kMinHeight, static_cast<int>(std::round(clampedWidth / kAspect))));
+        };
+        const auto fromHeight = [this](int height) {
+            const int clampedHeight = maxInt(kMinHeight, height);
+            return QSize(maxInt(kMinWidth, static_cast<int>(std::round(clampedHeight * kAspect))), clampedHeight);
+        };
+
+        if (edge == WMSZ_LEFT || edge == WMSZ_RIGHT) {
+            return fromWidth(targetWidth);
+        }
+
+        if (edge == WMSZ_TOP || edge == WMSZ_BOTTOM) {
+            return fromHeight(targetHeight);
+        }
+
+        const QSize currentSize = nativeClientSize();
+        if (!currentSize.isEmpty()) {
+            const int widthDelta = std::abs(targetWidth - currentSize.width());
+            const int heightDelta = static_cast<int>(std::round(std::abs(targetHeight - currentSize.height()) * kAspect));
+            return widthDelta >= heightDelta ? fromWidth(targetWidth) : fromHeight(targetHeight);
+        }
+
+        return targetClientSize(sourceSize);
+    }
+
     void adjustSizingRect(UINT edge, RECT *rect) const
     {
         if (!rect) {
@@ -160,7 +224,7 @@ private:
         const QSize frame = frameDelta();
         const int outerWidth = rect->right - rect->left;
         const int outerHeight = rect->bottom - rect->top;
-        const QSize clientTarget = targetClientSize(QSize(outerWidth - frame.width(), outerHeight - frame.height()));
+        const QSize clientTarget = targetClientSizeForSizingEdge(edge, QSize(outerWidth - frame.width(), outerHeight - frame.height()));
         const int targetOuterWidth = clientTarget.width() + frame.width();
         const int targetOuterHeight = clientTarget.height() + frame.height();
 
@@ -207,8 +271,10 @@ private:
 
     QWindow *m_window = nullptr;
     HWND m_hwnd = nullptr;
+    WNDPROC m_originalWndProc = nullptr;
     bool m_adjusting = false;
     bool m_pendingAdjust = false;
+    bool m_subclassed = false;
 };
 
 void logHandler(QtMsgType type, const QMessageLogContext &ctx, const QString &msg)
