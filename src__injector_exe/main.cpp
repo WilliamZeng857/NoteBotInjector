@@ -99,12 +99,20 @@ private:
             return callOriginal(hwnd, message, wParam, lParam);
         }
 
+        if (message == WM_ENTERSIZEMOVE) {
+            m_interactiveSizing = true;
+        }
+
         if (message == WM_SIZING) {
             adjustSizingRect(static_cast<UINT>(wParam), reinterpret_cast<RECT *>(lParam));
             return TRUE;
         }
 
         const LRESULT result = callOriginal(hwnd, message, wParam, lParam);
+        if (message == WM_EXITSIZEMOVE) {
+            m_interactiveSizing = false;
+            scheduleAdjust();
+        }
         if (message == WM_SIZE || message == WM_WINDOWPOSCHANGED) {
             scheduleAdjust();
         }
@@ -126,7 +134,7 @@ private:
 
     void scheduleAdjust()
     {
-        if (!m_window || m_adjusting || m_pendingAdjust) {
+        if (!m_window || m_adjusting || m_pendingAdjust || m_interactiveSizing) {
             return;
         }
 
@@ -274,6 +282,7 @@ private:
     WNDPROC m_originalWndProc = nullptr;
     bool m_adjusting = false;
     bool m_pendingAdjust = false;
+    bool m_interactiveSizing = false;
     bool m_subclassed = false;
 };
 
