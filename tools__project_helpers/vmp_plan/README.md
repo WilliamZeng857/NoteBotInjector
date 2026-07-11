@@ -2,11 +2,20 @@
 
 ## Current State
 
-VMP GUI automation is disabled. Do not put any generated Lua selector in a
-`.vmp` Script field and do not use the generated selector files. The previous
-callback path allowed VMProtect to persist `Procedure` entries into a project
-and resulted in a GUI read failure. Only the source-level protection boundaries,
-TSV policy tables, and current linker MAP evidence are valid at this point.
+`NoteBotAuth.dll` uses a script-owned VMProtect project. Its `.vmp` file keeps
+an empty `<Procedures>` list and loads the generated selector with `dofile()`.
+The selector derives every function address from the current linker MAP; do not
+add a `Procedure`, `MapAddress`, function name, RVA, or address by hand.
+
+After a successful VMP compile, run:
+
+```powershell
+python .\tools__project_helpers\vmp_plan\verify-auth-vmp-protection.py
+```
+
+The checker requires all planned functions to resolve in the current MAP, be
+present in the generated selector, appear as successful VMP selections in the
+current compile log, and exist in a newer protected PE artifact that loads.
 
 ## Ownership Boundary
 
@@ -17,6 +26,5 @@ TSV policy tables, and current linker MAP evidence are valid at this point.
 - `apply-vmp-plan.ps1` reads the current linker MAP and protection table, then
   generates the Lua selector. It does not modify a `.vmp` project.
 
-No VMP compile workflow is currently approved. Any future automation must be
-validated against a disposable GUI project before it can touch one of these
-four projects.
+The Auth compile workflow is approved only through its generated selector and
+the self-check script above. The other projects remain GUI-owned empty projects.
