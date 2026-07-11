@@ -2,25 +2,11 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
-$apply = Join-Path $PSScriptRoot 'apply-vmp-plan.ps1'
-$verify = Join-Path $PSScriptRoot 'verify-vmp-readiness.py'
+throw @'
+VMP GUI automation is disabled.
 
-foreach ($target in 'Auth', 'Injector', 'Updater', 'Model') {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Target $target
-    if ($LASTEXITCODE -ne 0) {
-        throw "VMP selector generation failed: $target"
-    }
-}
-
-& python $verify
-if ($LASTEXITCODE -ne 0) {
-    throw 'VMP readiness verification failed'
-}
-
-Write-Host ''
-Write-Host 'Open the matching current plain binary and empty .vmp project in VMProtect.'
-Write-Host 'Paste only one matching line into the project Script box, then click Compile manually:'
-foreach ($name in 'NoteBotAuth', 'NoteBotInjector', 'NoteBotUpdater', 'NoteBotModel') {
-    $selector = Join-Path $PSScriptRoot "generated\$name.apply_protection.lua"
-    Write-Host "dofile([[$selector]])"
-}
+The previous Lua callback path let VMProtect persist generated Procedure entries
+into a GUI project and produced a project that VMP could no longer read. Do not
+load generated selectors into a .vmp Script field and do not compile from this
+helper until the workflow has been isolated and validated against this VMP build.
+'@

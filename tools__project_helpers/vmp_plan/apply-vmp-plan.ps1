@@ -6,6 +6,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+throw @'
+VMP selection generation is disabled.
+
+Do not generate or load a Lua selector into a VMProtect project. The prior
+callback workflow can cause VMProtect to persist Procedure entries and leave
+the project unreadable. The source protection tables and linker MAPs remain
+available for a future isolated compatibility validation.
+'@
+
 $root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $planDir = $PSScriptRoot
 

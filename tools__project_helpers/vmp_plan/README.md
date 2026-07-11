@@ -1,4 +1,12 @@
-# NoteBot VMP GUI Workflow
+# NoteBot VMP Status
+
+## Current State
+
+VMP GUI automation is disabled. Do not put any generated Lua selector in a
+`.vmp` Script field and do not use the generated selector files. The previous
+callback path allowed VMProtect to persist `Procedure` entries into a project
+and resulted in a GUI read failure. Only the source-level protection boundaries,
+TSV policy tables, and current linker MAP evidence are valid at this point.
 
 ## Ownership Boundary
 
@@ -9,28 +17,6 @@
 - `apply-vmp-plan.ps1` reads the current linker MAP and protection table, then
   generates the Lua selector. It does not modify a `.vmp` project.
 
-## Before Every GUI Compile
-
-1. Run the ordinary build so the plain binary and MAP come from the same build.
-2. Generate all selectors without touching the VMP projects:
-
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\tools__project_helpers\vmp_plan\prepare-vmp-gui.ps1
-   ```
-
-3. Close and reopen VMProtect. Open the matching current plain binary and its
-   empty `.vmp` project. In the project Script box, use only the `dofile(...)`
-   line printed by the generator. Do not select procedures manually.
-4. Click Compile. The Lua `OnBeforeCompilation()` callback selects all
-   functions only after VMProtect has built its function map.
-5. Accept a run only when the target log ends in `ok=<count> miss=0`.
-   Any `MISS`, `AMBIGUOUS`, API error, or partial result is a failed pass.
-
-## Logs
-
-Each generated selector writes its GUI result to:
-
-`tools__project_helpers\vmp_plan\generated\logs\<target>.vmprotect_last_run.log`
-
-The VMP protection policy remains in the four `*.protect.tsv` files. Change
-that policy and rebuild; never edit generated Lua tables by hand.
+No VMP compile workflow is currently approved. Any future automation must be
+validated against a disposable GUI project before it can touch one of these
+four projects.

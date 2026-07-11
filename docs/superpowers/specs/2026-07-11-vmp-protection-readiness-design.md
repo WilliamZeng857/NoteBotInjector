@@ -72,6 +72,7 @@ the common CMake option and points `NB_VMP_SDK_DIR` at the SDK include root.
 The readiness verifier has a static mode for source/table/CMake integrity and
 a full mode after build for MAP/table symbol resolution. The release build
 also verifies UTF-8 validity, unchanged BOM state for modified existing files,
-`git diff --check`, and all four output artifacts. The user opens the current
-plain binary and matching empty project in VMProtect, pastes the generated
-`dofile(...)` loader into the project Script field, and clicks Compile manually.
+`git diff --check`, and all four output artifacts. GUI automation remains
+disabled until it has been validated on a disposable project against the
+installed VMProtect version; generated selectors must not be loaded through a
+project Script field.
