@@ -95,6 +95,7 @@ int parseTierValue(const QJsonValue &value)
 NB_NOINLINE QByteArray NBVmp_Ticket_DeriveWrapperKey(const QString &sessionId,
                                                      const QString &ticketSha256)
 {
+    NB_VMP_ULTRA("NB.Ticket.DeriveWrapperKey");
     QByteArray material;
     material.reserve(128);
     material.append(kWrapPrefix);
@@ -103,15 +104,20 @@ NB_NOINLINE QByteArray NBVmp_Ticket_DeriveWrapperKey(const QString &sessionId,
     material.append(kBuildSalt);
     material.append(kFixedFragmentA);
     material.append(kFixedFragmentB);
-    return QCryptographicHash::hash(material, QCryptographicHash::Sha256);
+    const QByteArray result = QCryptographicHash::hash(material, QCryptographicHash::Sha256);
+    NB_VMP_END();
+    return result;
 }
 
 NB_NOINLINE QString NBVmp_Ticket_ComputeTicketSha256(const QString &serverTicketPayload)
 {
-    return QString::fromLatin1(
+    NB_VMP_VIRTUALIZE("NB.Ticket.ComputeTicketSha256");
+    const QString result = QString::fromLatin1(
                QCryptographicHash::hash(serverTicketPayload.toUtf8(),
                                         QCryptographicHash::Sha256).toHex())
         .toLower();
+    NB_VMP_END();
+    return result;
 }
 
 NB_NOINLINE bool NBVmp_Ticket_DecryptWrapper(const QByteArray &wrapperKey,

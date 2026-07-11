@@ -18,6 +18,9 @@ PROJECT_OBJ_FILES = {
     'crypto_utils.cpp.obj',
     'protected_download_ops.cpp.obj',
     'protected_name_ops.cpp.obj',
+    'protected_ticket_ops.cpp.obj',
+    'protected_verify_ops.cpp.obj',
+    'protected_v3_ops.cpp.obj',
     'name_injector.cpp.obj',
 }
 

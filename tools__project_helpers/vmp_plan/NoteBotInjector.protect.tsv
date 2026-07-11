@@ -1,0 +1,12 @@
+# NoteBotInjector VMP protection table
+# columns: category<TAB>symbol_key<TAB>module<TAB>note
+category	symbol_key	module	note
+mutation	NBVmp_Injector_NormalizeLicenseKeyForIdentity	backend	canonicalize a local key before identity derivation
+virtualize	NBVmp_Injector_MakeLocalKeyId	backend	derive the local stable identity from the canonical key
+virtualize	NBVmp_Injector_ParseRemoteModelAsset	backend	validate a remote model asset descriptor
+virtualize	NBVmp_Injector_ParseRemoteModelEntry	backend	validate model entitlement and required assets
+virtualize	NBVmp_Injector_HashBytesHex	updater	derive artifact or certificate digest from bounded bytes
+mutation	NBVmp_Injector_IsIpLiteralHost	updater	classify a download host before certificate handling
+mutation	NBVmp_Injector_SignatureToHex	updater	encode the device signature for canonical manifest fields
+virtualize	NBVmp_Injector_CanonicalJsonString	updater	assemble canonical manifest JSON before signing
+mutation	NBVmp_Injector_SafeArtifactFileName	updater	sanitize server artifact file name before cache write

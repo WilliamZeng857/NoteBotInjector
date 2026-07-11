@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Injector', 'Auth')]
+    [ValidateSet('Injector', 'Updater', 'Auth', 'Model')]
     [string]$Target
 )
 
@@ -15,10 +15,20 @@ switch ($Target) {
         $binaryName = 'NoteBotInjector.exe'
         $buildDir = Join-Path $root 'build__injector_exe_cache'
     }
+    'Updater' {
+        $baseName = 'NoteBotUpdater'
+        $binaryName = 'NoteBotUpdater.exe'
+        $buildDir = Join-Path $root 'build__injector_exe_cache'
+    }
     'Auth' {
         $baseName = 'NoteBotAuth'
         $binaryName = 'NoteBotAuth.dll'
         $buildDir = Join-Path $root 'build__auth_dll_cache'
+    }
+    'Model' {
+        $baseName = 'NoteBotModel'
+        $binaryName = 'NoteBotModel.dll'
+        $buildDir = Join-Path $root 'build__injector_exe_cache'
     }
 }
 
@@ -114,7 +124,7 @@ function Get-ProtectionEntries {
     return $entries
 }
 
-function Get-AuthMapCandidates {
+function Get-MapCandidates {
     param([string]$Path)
 
     $items = New-Object System.Collections.Generic.List[object]
@@ -123,7 +133,7 @@ function Get-AuthMapCandidates {
     }
 
     Get-Content -LiteralPath $Path | ForEach-Object {
-        if ($_ -match '^\s*([0-9A-Fa-f]{4}:[0-9A-Fa-f]{8})\s+(\S*NBVmp_\S*)\s+([0-9A-Fa-f]{16})\s+(?:f\s+)?(.+?\.obj)\s*$') {
+        if ($_ -match '^\s*([0-9A-Fa-f]{4}:[0-9A-Fa-f]{8})\s+(\?NBVmp_\S*)\s+([0-9A-Fa-f]{16})\s+(?:f\s+)?(.+?\.obj)\s*$') {
             $items.Add([pscustomobject]@{
                 Segment = $Matches[1]
                 Symbol  = $Matches[2]
@@ -137,15 +147,18 @@ function Get-AuthMapCandidates {
     return $items
 }
 
-function Get-AuthObjectCandidates {
-    param([string]$BuildDir)
+function Get-ObjectCandidates {
+    param(
+        [string]$BuildDir,
+        [string]$BaseName
+    )
 
     $dumpbin = Resolve-Dumpbin
     if (-not $dumpbin) {
         return @()
     }
 
-    $objectRoot = Join-Path $BuildDir 'CMakeFiles\NoteBotAuth.dir'
+    $objectRoot = Join-Path $BuildDir "CMakeFiles\$BaseName.dir"
     if (-not (Test-Path -LiteralPath $objectRoot)) {
         return @()
     }
@@ -208,53 +221,51 @@ function Assert-NoUnknownProtectedSymbols {
 
 $entries = Get-ProtectionEntries -Path $selectionPath
 
-if ($Target -eq 'Auth') {
-    $mapCandidates = @(Get-AuthMapCandidates -Path $mapPath)
-    $objectCandidates = @()
-    if ($mapCandidates.Count -eq 0) {
-        $objectCandidates = @(Get-AuthObjectCandidates -BuildDir $buildDir)
-    }
-
-    $allCandidates = if ($mapCandidates.Count -gt 0) { $mapCandidates } else { $objectCandidates }
-    if ($allCandidates.Count -eq 0) {
-        throw "Could not resolve any NBVmp_* symbols from map or object files"
-    }
-
-    Assert-NoUnknownProtectedSymbols -Candidates $allCandidates -Entries $entries
-
-    $generatedSelection = Join-Path $buildDir "$baseName.vmp.generated.tsv"
-    $rows = New-Object System.Collections.Generic.List[string]
-    $rows.Add("# $baseName generated VMP selection")
-    $rows.Add("# source_table: $selectionPath")
-    if (Test-Path -LiteralPath $mapPath) {
-        $rows.Add("# source_map: $mapPath")
-    }
-    $rows.Add("category`taddress`tsymbol`tobject`tmodule`tnote")
-
-    foreach ($entry in $entries) {
-        $matches = @(Find-MatchingCandidates -Candidates $allCandidates -SymbolKey $entry.SymbolKey)
-        if ($matches.Count -eq 0) {
-            throw "Symbol not found for protection entry: $($entry.SymbolKey)"
-        }
-        if ($matches.Count -gt 1) {
-            $rendered = $matches | ForEach-Object { $_.Symbol }
-            throw ("Multiple candidate symbols matched protection entry '{0}': {1}" -f $entry.SymbolKey, ($rendered -join ', '))
-        }
-
-        $match = $matches[0]
-        $rows.Add(("{0}`t{1}`t{2}`t{3}`t{4}`t{5}" -f `
-            $entry.Category, `
-            $match.Address, `
-            $match.Symbol, `
-            $match.Object, `
-            $entry.Module, `
-            $entry.Note))
-    }
-
-    $rows | Set-Content -LiteralPath $generatedSelection -Encoding ASCII
-    $effectiveSelectionPath = $generatedSelection
-    Write-Host "Generated Auth VMP selection: $generatedSelection"
+$mapCandidates = @(Get-MapCandidates -Path $mapPath)
+$objectCandidates = @()
+if ($mapCandidates.Count -eq 0) {
+    $objectCandidates = @(Get-ObjectCandidates -BuildDir $buildDir -BaseName $baseName)
 }
+
+$allCandidates = if ($mapCandidates.Count -gt 0) { $mapCandidates } else { $objectCandidates }
+if ($allCandidates.Count -eq 0) {
+    throw "Could not resolve any NBVmp_* symbols from map or object files for $baseName"
+}
+
+Assert-NoUnknownProtectedSymbols -Candidates $allCandidates -Entries $entries
+
+$generatedSelection = Join-Path $buildDir "$baseName.vmp.generated.tsv"
+$rows = New-Object System.Collections.Generic.List[string]
+$rows.Add("# $baseName generated VMP selection")
+$rows.Add("# source_table: $selectionPath")
+if (Test-Path -LiteralPath $mapPath) {
+    $rows.Add("# source_map: $mapPath")
+}
+$rows.Add("category`taddress`tsymbol`tobject`tmodule`tnote")
+
+foreach ($entry in $entries) {
+    $matches = @(Find-MatchingCandidates -Candidates $allCandidates -SymbolKey $entry.SymbolKey)
+    if ($matches.Count -eq 0) {
+        throw "Symbol not found for protection entry: $($entry.SymbolKey)"
+    }
+    if ($matches.Count -gt 1) {
+        $rendered = $matches | ForEach-Object { $_.Symbol }
+        throw ("Multiple candidate symbols matched protection entry '{0}': {1}" -f $entry.SymbolKey, ($rendered -join ', '))
+    }
+
+    $match = $matches[0]
+    $rows.Add(("{0}`t{1}`t{2}`t{3}`t{4}`t{5}" -f `
+        $entry.Category, `
+        $match.Address, `
+        $match.Symbol, `
+        $match.Object, `
+        $entry.Module, `
+        $entry.Note))
+}
+
+$rows | Set-Content -LiteralPath $generatedSelection -Encoding ASCII
+$effectiveSelectionPath = $generatedSelection
+Write-Host "Generated $baseName VMP selection: $generatedSelection"
 
 $builder = Join-Path $planDir 'build-vmp-project.ps1'
 & $builder `

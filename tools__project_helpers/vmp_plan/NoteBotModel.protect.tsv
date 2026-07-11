@@ -1,0 +1,12 @@
+# NoteBotModel VMP protection table
+# columns: category<TAB>symbol_key<TAB>module<TAB>note
+category	symbol_key	module	note
+mutation	NBVmp_Model_HookIdentity	model_api	select a stable hook identity
+mutation	NBVmp_Model_HookAddress	model_api	derive the active hook address from base and rva
+ultra	NBVmp_Model_CallTargetFromRel32	model_api	resolve a relative call target from hook bytes
+ultra	NBVmp_Model_HookBytesCompatible	model_api	gate hook installation against expected compatible bytes
+mutation	NBVmp_Model_NormalizeArmSize	model_api	canonicalize the arm-size value
+ultra	NBVmp_Model_MakeJmp5	model_api	construct a bounded five-byte relative jump
+ultra	NBVmp_Model_MakeBoolShellcode	model_api	construct the boolean or integer hook shellcode
+ultra	NBVmp_Model_MakeStringArgShellcode	model_api	construct the string-argument hook shellcode
+ultra	NBVmp_Model_MakeSkinDataShellcode	model_api	construct the skin-data hook shellcode

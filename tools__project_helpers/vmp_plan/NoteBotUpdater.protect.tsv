@@ -1,0 +1,6 @@
+# NoteBotUpdater VMP protection table
+# columns: category<TAB>symbol_key<TAB>module<TAB>note
+category	symbol_key	module	note
+mutation	NBVmp_Updater_ArgValue	updater_main	read a named updater argument without changing flow
+mutation	NBVmp_Updater_ArgUInt	updater_main	parse the bounded updater process identifier
+ultra	NBVmp_Updater_HashesMatch	updater_main	validate copied output against source digest before completion

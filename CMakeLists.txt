@@ -8,6 +8,8 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
 set(CMAKE_PREFIX_PATH "C:/QtBuild/qt6-static")
+option(NB_ENABLE_VMP_MARKERS "Enable VMProtect SDK markers for release artifacts" OFF)
+set(NB_VMP_SDK_DIR "" CACHE PATH "Directory that contains VMProtectSDK.h or its parent include directory")
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick QuickControls2 QuickDialogs2 Network)
 
@@ -80,6 +82,25 @@ if(MSVC)
     target_compile_options(NoteBotModel PRIVATE /utf-8)
 endif()
 
+if(NB_ENABLE_VMP_MARKERS)
+    set(_nb_vmp_hint_paths)
+    if(NB_VMP_SDK_DIR)
+        list(APPEND _nb_vmp_hint_paths "${NB_VMP_SDK_DIR}" "${NB_VMP_SDK_DIR}/include")
+    endif()
+    if(DEFINED ENV{NB_VMP_SDK_DIR} AND NOT "$ENV{NB_VMP_SDK_DIR}" STREQUAL "")
+        list(APPEND _nb_vmp_hint_paths "$ENV{NB_VMP_SDK_DIR}" "$ENV{NB_VMP_SDK_DIR}/include")
+    endif()
+    find_path(NB_VMP_SDK_INCLUDE_DIR NAMES VMProtectSDK.h HINTS ${_nb_vmp_hint_paths})
+    if(NOT NB_VMP_SDK_INCLUDE_DIR)
+        message(FATAL_ERROR
+            "NB_ENABLE_VMP_MARKERS=ON but VMProtectSDK.h was not found. Set NB_VMP_SDK_DIR.")
+    endif()
+    foreach(_nb_vmp_target NoteBotInjector NoteBotUpdater NoteBotModel)
+        target_compile_definitions(${_nb_vmp_target} PRIVATE NB_VMP_BUILD)
+        target_include_directories(${_nb_vmp_target} PRIVATE "${NB_VMP_SDK_INCLUDE_DIR}")
+    endforeach()
+endif()
+
 set_target_properties(NoteBotInjector PROPERTIES
     WIN32_EXECUTABLE TRUE
     OUTPUT_NAME "NoteBotInjector"
@@ -129,8 +150,11 @@ add_custom_target(NoteBotUpdaterEmbeddedResource ALL
 
 add_dependencies(NoteBotInjector NoteBotUpdaterEmbeddedResource)
 
-# 生成 MAP 文件用于 VMP 加壳分析
-target_link_options(NoteBotInjector PRIVATE /MAP:NoteBotInjector.map)
+# Generate full linker maps for function-level VMP selection. Keep noinline
+# marker leaves alive and unique even when release optimization is enabled.
+target_link_options(NoteBotInjector PRIVATE /MAP:NoteBotInjector.map /DEBUG /OPT:NOREF /OPT:NOICF)
+target_link_options(NoteBotUpdater PRIVATE /MAP:NoteBotUpdater.map /DEBUG /OPT:NOREF /OPT:NOICF)
+target_link_options(NoteBotModel PRIVATE /MAP:NoteBotModel.map /DEBUG /OPT:NOREF /OPT:NOICF)
 
 target_link_libraries(NoteBotInjector PRIVATE
     Qt6::Core

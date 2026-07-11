@@ -2,6 +2,7 @@
 #include "win32process.h"
 #include "win32injector.h"
 #include "updater.h"
+#include "vmp_defs.h"
 #include "modelcatalogmodel.h"
 #include <QProcess>
 #include <QStandardPaths>
@@ -50,22 +51,28 @@ constexpr int kExpectedAuthAbiVersion = 1;
 constexpr int kExpectedModelProtocolVersion = 1;
 constexpr int kExpectedModelAbiVersion = 2;
 
-static QString normalizeLicenseKeyForIdentity(const QString &key)
+static NB_NOINLINE QString NBVmp_Injector_NormalizeLicenseKeyForIdentity(const QString &key)
 {
+    NB_VMP_MUTATE("NB.Injector.NormalizeLicenseKeyForIdentity");
     QString out = key.trimmed().toUpper();
     out.remove(QRegularExpression(QStringLiteral("\\s+")));
+    NB_VMP_END();
     return out;
 }
 
-static QString makeLocalKeyId(const QString &key)
+static NB_NOINLINE QString NBVmp_Injector_MakeLocalKeyId(const QString &key)
 {
-    const QString normalized = normalizeLicenseKeyForIdentity(key);
+    NB_VMP_VIRTUALIZE("NB.Injector.MakeLocalKeyId");
+    const QString normalized = NBVmp_Injector_NormalizeLicenseKeyForIdentity(key);
     if (normalized.isEmpty()) {
+        NB_VMP_END();
         return QString();
     }
     const QByteArray hash =
         QCryptographicHash::hash(normalized.toUtf8(), QCryptographicHash::Sha256).toHex();
-    return QStringLiteral("kid_%1").arg(QString::fromLatin1(hash.left(16)).toLower());
+    const QString result = QStringLiteral("kid_%1").arg(QString::fromLatin1(hash.left(16)).toLower());
+    NB_VMP_END();
+    return result;
 }
 
 static QString computeFileMd5(const QString &filePath)
@@ -229,7 +236,7 @@ static QString injectorModelRuntimeCacheSubdir()
 
 static QString activeModelSettingKey(const QString &licenseKey)
 {
-    const QString keyId = makeLocalKeyId(licenseKey);
+    const QString keyId = NBVmp_Injector_MakeLocalKeyId(licenseKey);
     return keyId.isEmpty()
         ? QStringLiteral("activeModelId")
         : QStringLiteral("activeModelId/%1").arg(keyId);
@@ -284,24 +291,30 @@ struct RemoteModelEntry {
     bool hasCover = false;
 };
 
-static bool parseRemoteModelAsset(const QJsonObject &obj, RemoteModelAsset *asset)
+static NB_NOINLINE bool NBVmp_Injector_ParseRemoteModelAsset(const QJsonObject &obj, RemoteModelAsset *asset)
 {
+    NB_VMP_VIRTUALIZE("NB.Injector.ParseRemoteModelAsset");
     if (!asset) {
+        NB_VMP_END();
         return false;
     }
     asset->fileName = obj.value(QStringLiteral("file_name")).toString().trimmed();
     asset->sha256 = obj.value(QStringLiteral("sha256")).toString().trimmed().toLower();
     asset->size = obj.value(QStringLiteral("size")).toVariant().toLongLong();
     asset->downloadUrl = QUrl(obj.value(QStringLiteral("download_url")).toString().trimmed());
-    return !asset->fileName.isEmpty() &&
+    const bool valid = !asset->fileName.isEmpty() &&
            !asset->sha256.isEmpty() &&
            asset->size > 0 &&
            asset->downloadUrl.isValid();
+    NB_VMP_END();
+    return valid;
 }
 
-static bool parseRemoteModelEntry(const QJsonObject &obj, RemoteModelEntry *entry)
+static NB_NOINLINE bool NBVmp_Injector_ParseRemoteModelEntry(const QJsonObject &obj, RemoteModelEntry *entry)
 {
+    NB_VMP_VIRTUALIZE("NB.Injector.ParseRemoteModelEntry");
     if (!entry) {
+        NB_VMP_END();
         return false;
     }
     entry->modelId = obj.value(QStringLiteral("model_id")).toString().trimmed();
@@ -311,21 +324,27 @@ static bool parseRemoteModelEntry(const QJsonObject &obj, RemoteModelEntry *entr
     entry->stateLabel = obj.value(QStringLiteral("state_label")).toString().trimmed();
     entry->orderIndex = obj.value(QStringLiteral("order_index")).toInt(0);
     entry->hasGeometry =
-        parseRemoteModelAsset(obj.value(QStringLiteral("geometry_asset")).toObject(), &entry->geometry);
+        NBVmp_Injector_ParseRemoteModelAsset(obj.value(QStringLiteral("geometry_asset")).toObject(), &entry->geometry);
     entry->hasTexture =
-        parseRemoteModelAsset(obj.value(QStringLiteral("texture_asset")).toObject(), &entry->texture);
+        NBVmp_Injector_ParseRemoteModelAsset(obj.value(QStringLiteral("texture_asset")).toObject(), &entry->texture);
     entry->hasCover =
-        parseRemoteModelAsset(obj.value(QStringLiteral("cover_asset")).toObject(), &entry->cover);
+        NBVmp_Injector_ParseRemoteModelAsset(obj.value(QStringLiteral("cover_asset")).toObject(), &entry->cover);
 
     if (entry->modelId.isEmpty()) {
+        NB_VMP_END();
         return false;
     }
     if (entry->entitlementState == QStringLiteral("owned")) {
-        return entry->hasGeometry && entry->hasTexture;
+        const bool valid = entry->hasGeometry && entry->hasTexture;
+        NB_VMP_END();
+        return valid;
     }
     if (entry->entitlementState == QStringLiteral("unowned")) {
-        return entry->hasCover;
+        const bool valid = entry->hasCover;
+        NB_VMP_END();
+        return valid;
     }
+    NB_VMP_END();
     return false;
 }
 
@@ -1016,7 +1035,7 @@ void Backend::refreshModelEntitlementsAsync()
 
         for (const QJsonValue &value : models) {
             RemoteModelEntry remote;
-            if (!parseRemoteModelEntry(value.toObject(), &remote)) {
+            if (!NBVmp_Injector_ParseRemoteModelEntry(value.toObject(), &remote)) {
                 continue;
             }
 
@@ -2656,7 +2675,7 @@ void Backend::verifyLicense()
         const QJsonObject cachedSnapshot = extractStatusSnapshot(snapshotResp);
         const QString cachedKeyId =
             cachedSnapshot.value(QStringLiteral("key_id")).toString().trimmed();
-        const QString typedKeyId = makeLocalKeyId(m_licenseKey);
+        const QString typedKeyId = NBVmp_Injector_MakeLocalKeyId(m_licenseKey);
         const bool cachedActive = cachedSnapshot.value(QStringLiteral("active")).toBool(false);
         if (cachedKeyId.isEmpty() || typedKeyId.isEmpty()) {
             syncStatusFromDll();

@@ -19,6 +19,7 @@ where cl.exe
 if exist build__auth_dll_cache rmdir /s /q build__auth_dll_cache
 mkdir build__auth_dll_cache
 set "NB_AUTH_VMP_CMAKE_FLAGS="
+if /I "%NB_ENABLE_VMP_MARKERS%"=="1" set "NB_AUTH_VMP_CMAKE_FLAGS=%NB_AUTH_VMP_CMAKE_FLAGS% -DNB_AUTH_ENABLE_VMP_MARKERS=ON"
 if /I "%NB_AUTH_ENABLE_VMP_MARKERS%"=="1" set "NB_AUTH_VMP_CMAKE_FLAGS=%NB_AUTH_VMP_CMAKE_FLAGS% -DNB_AUTH_ENABLE_VMP_MARKERS=ON"
 if not "%NB_VMP_SDK_DIR%"=="" set "NB_AUTH_VMP_CMAKE_FLAGS=%NB_AUTH_VMP_CMAKE_FLAGS% -DNB_VMP_SDK_DIR=""%NB_VMP_SDK_DIR%"""
 cmake -B build__auth_dll_cache -S src__auth_dll -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/QtBuild/qt6-static -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded %NB_AUTH_VMP_CMAKE_FLAGS%
@@ -31,7 +32,10 @@ echo [BUILD] NoteBotAuth.dll compiled OK
 
 if exist build__injector_exe_cache rmdir /s /q build__injector_exe_cache
 mkdir build__injector_exe_cache
-cmake -B build__injector_exe_cache -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/QtBuild/qt6-static -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+set "NB_EXE_VMP_CMAKE_FLAGS="
+if /I "%NB_ENABLE_VMP_MARKERS%"=="1" set "NB_EXE_VMP_CMAKE_FLAGS=%NB_EXE_VMP_CMAKE_FLAGS% -DNB_ENABLE_VMP_MARKERS=ON"
+if not "%NB_VMP_SDK_DIR%"=="" set "NB_EXE_VMP_CMAKE_FLAGS=%NB_EXE_VMP_CMAKE_FLAGS% -DNB_VMP_SDK_DIR=""%NB_VMP_SDK_DIR%"""
+cmake -B build__injector_exe_cache -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/QtBuild/qt6-static -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded %NB_EXE_VMP_CMAKE_FLAGS%
 if %errorlevel% neq 0 (
     echo [BUILD] EXE/Updater/Overlay CMake configure FAILED
     exit /b 1

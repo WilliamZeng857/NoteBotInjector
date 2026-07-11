@@ -12,6 +12,8 @@
 #include <QStringList>
 #include <QTextStream>
 
+#include "../src__injector_exe/vmp_defs.h"
+
 namespace {
 
 QString localAppDataPath()
@@ -63,20 +65,35 @@ void appendLog(const QString &action,
         << " error_message=\"" << errorMessage << "\"\n";
 }
 
-QString argValue(const QStringList &args, const QString &name)
+NB_NOINLINE QString NBVmp_Updater_ArgValue(const QStringList &args, const QString &name)
 {
+    NB_VMP_MUTATE("NB.Updater.ArgValue");
     const int index = args.indexOf(name);
     if (index < 0 || index + 1 >= args.size()) {
+        NB_VMP_END();
         return QString();
     }
-    return args.at(index + 1).trimmed();
+    const QString value = args.at(index + 1).trimmed();
+    NB_VMP_END();
+    return value;
 }
 
-quint32 argUInt(const QStringList &args, const QString &name)
+NB_NOINLINE quint32 NBVmp_Updater_ArgUInt(const QStringList &args, const QString &name)
 {
+    NB_VMP_MUTATE("NB.Updater.ArgUInt");
     bool ok = false;
-    const quint32 value = argValue(args, name).toUInt(&ok);
-    return ok ? value : 0;
+    const quint32 value = NBVmp_Updater_ArgValue(args, name).toUInt(&ok);
+    const quint32 result = ok ? value : 0;
+    NB_VMP_END();
+    return result;
+}
+
+NB_NOINLINE bool NBVmp_Updater_HashesMatch(const QString &sourceHash, const QString &targetHash)
+{
+    NB_VMP_ULTRA("NB.Updater.HashesMatch");
+    const bool match = !sourceHash.isEmpty() && sourceHash == targetHash;
+    NB_VMP_END();
+    return match;
 }
 
 bool waitForExit(quint32 pid, QString *errorMessage)
@@ -173,7 +190,7 @@ bool replaceFile(const QString &src,
 
     const QString srcSha = sha256Hex(src);
     const QString dstSha = sha256Hex(dst);
-    if (srcSha.isEmpty() || dstSha.isEmpty() || srcSha != dstSha) {
+    if (!NBVmp_Updater_HashesMatch(srcSha, dstSha)) {
         QFile::remove(dst);
         if (!backup.isEmpty() && QFile::exists(backup)) {
             QFile::copy(backup, dst);
@@ -220,13 +237,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     }
 
     const QString action = args.size() > 1 ? args.at(1).trimmed() : QString();
-    const QString src = argValue(args, QStringLiteral("--src"));
-    const QString dst = argValue(args, QStringLiteral("--dst"));
-    const QString backup = argValue(args, QStringLiteral("--backup"));
-    const QString restart = argValue(args, QStringLiteral("--restart"));
-    const quint32 pid = argUInt(args, QStringLiteral("--pid")) != 0
-        ? argUInt(args, QStringLiteral("--pid"))
-        : argUInt(args, QStringLiteral("--wait-pid"));
+    const QString src = NBVmp_Updater_ArgValue(args, QStringLiteral("--src"));
+    const QString dst = NBVmp_Updater_ArgValue(args, QStringLiteral("--dst"));
+    const QString backup = NBVmp_Updater_ArgValue(args, QStringLiteral("--backup"));
+    const QString restart = NBVmp_Updater_ArgValue(args, QStringLiteral("--restart"));
+    const quint32 requestedPid = NBVmp_Updater_ArgUInt(args, QStringLiteral("--pid"));
+    const quint32 pid = requestedPid != 0
+        ? requestedPid
+        : NBVmp_Updater_ArgUInt(args, QStringLiteral("--wait-pid"));
 
     if (action != QStringLiteral("--replace-main") &&
         action != QStringLiteral("--replace-auth-dll") &&

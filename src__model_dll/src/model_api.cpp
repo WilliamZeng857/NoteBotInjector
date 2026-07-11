@@ -1,4 +1,5 @@
 #include "../include/notebot_model.h"
+#include "../../src__injector_exe/vmp_defs.h"
 
 #include <QtCore/QByteArray>
 #include <QtCore/QCoreApplication>
@@ -615,41 +616,55 @@ const std::unordered_map<std::string, GroupRequirement> &groupRequirements()
     return groups;
 }
 
-QString hookIdentity(const HookDef &hook)
+NB_NOINLINE QString NBVmp_Model_HookIdentity(const HookDef &hook)
 {
-    return hook.hookId.isEmpty() ? hook.name : hook.hookId;
+    NB_VMP_MUTATE("NB.Model.HookIdentity");
+    const QString result = hook.hookId.isEmpty() ? hook.name : hook.hookId;
+    NB_VMP_END();
+    return result;
 }
 
-quint64 hookAddress(quint64 base, const HookDef &hook)
+NB_NOINLINE quint64 NBVmp_Model_HookAddress(quint64 base, const HookDef &hook)
 {
-    return hook.address ? hook.address : base + hook.rva;
+    NB_VMP_MUTATE("NB.Model.HookAddress");
+    const quint64 result = hook.address ? hook.address : base + hook.rva;
+    NB_VMP_END();
+    return result;
 }
 
-quint64 callTargetFromRel32(quint64 callAddr, const QByteArray &bytes)
+NB_NOINLINE quint64 NBVmp_Model_CallTargetFromRel32(quint64 callAddr, const QByteArray &bytes)
 {
+    NB_VMP_ULTRA("NB.Model.CallTargetFromRel32");
     const qint32 rel = readI32(bytes, 1);
-    return callAddr + 5 + rel;
+    const quint64 result = callAddr + 5 + rel;
+    NB_VMP_END();
+    return result;
 }
 
-std::pair<bool, QString> hookBytesCompatible(quint64 addr,
-                                             const QByteArray &current,
-                                             const HookDef &hook,
-                                             quint64 moduleBase,
-                                             quint32 moduleSize)
+NB_NOINLINE std::pair<bool, QString> NBVmp_Model_HookBytesCompatible(quint64 addr,
+                                                                      const QByteArray &current,
+                                                                      const HookDef &hook,
+                                                                      quint64 moduleBase,
+                                                                      quint32 moduleSize)
 {
+    NB_VMP_ULTRA("NB.Model.HookBytesCompatible");
     if (current == hook.expected) {
+        NB_VMP_END();
         return {true, QStringLiteral("exact")};
     }
     if (current.size() >= 5 &&
         hook.expected.size() >= 5 &&
         uchar(hook.expected.at(0)) == 0xE8 &&
         uchar(current.at(0)) == 0xE8) {
-        const quint64 target = callTargetFromRel32(addr, current);
+        const quint64 target = NBVmp_Model_CallTargetFromRel32(addr, current);
         const quint64 end = moduleBase + moduleSize;
         if (moduleBase <= target && target < end) {
-            return {true, QStringLiteral("call_rel32_drift:%1").arg(hex64(target))};
+            const auto result = std::make_pair(true, QStringLiteral("call_rel32_drift:%1").arg(hex64(target)));
+            NB_VMP_END();
+            return result;
         }
     }
+    NB_VMP_END();
     return {false, QStringLiteral("mismatch")};
 }
 
@@ -677,12 +692,15 @@ struct PayloadConfig {
     QByteArray skinRgba;
 };
 
-QString normalizeArmSize(const QString &value)
+NB_NOINLINE QString NBVmp_Model_NormalizeArmSize(const QString &value)
 {
+    NB_VMP_MUTATE("NB.Model.NormalizeArmSize");
     const QString normalized = value.trimmed().toLower();
-    return normalized == QStringLiteral("wide")
+    const QString result = normalized == QStringLiteral("wide")
         ? QStringLiteral("wide")
         : QStringLiteral("slim");
+    NB_VMP_END();
+    return result;
 }
 
 bool readTextFile(const QString &path, QString *out, QString *error)
@@ -782,7 +800,7 @@ std::optional<PayloadConfig> parseConfig(const char *json, QString *error)
     cfg.texturePath = obj.value(QStringLiteral("texture_path")).toString().trimmed();
     cfg.resourcePatch = obj.value(QStringLiteral("resource_patch")).toString().trimmed();
     cfg.geometryEngineVersion = obj.value(QStringLiteral("geometry_engine_version")).toString(cfg.geometryEngineVersion).trimmed();
-    cfg.armSize = normalizeArmSize(obj.value(QStringLiteral("arm_size")).toString(cfg.armSize));
+    cfg.armSize = NBVmp_Model_NormalizeArmSize(obj.value(QStringLiteral("arm_size")).toString(cfg.armSize));
     cfg.trustedValue = obj.value(QStringLiteral("trusted_raw")).toInt(obj.value(QStringLiteral("trusted")).toBool(true) ? 1 : 0);
     cfg.premiumValue = obj.value(QStringLiteral("premium")).toBool(true) ? 1 : 0;
     cfg.personaValue = obj.value(QStringLiteral("persona")).toBool(true) ? 1 : 0;
@@ -896,7 +914,7 @@ bool resolveHookAddresses(HANDLE process,
     const auto &groups = groupRequirements();
     std::vector<std::string> neededGroups;
     for (const HookDef &hook : *hooks) {
-        const std::string id = hookIdentity(hook).toStdString();
+        const std::string id = NBVmp_Model_HookIdentity(hook).toStdString();
         const auto it = locators.find(id);
         if (it != locators.end()) {
             if (std::find(neededGroups.begin(), neededGroups.end(), it->second.group.toStdString()) == neededGroups.end()) {
@@ -952,7 +970,7 @@ bool resolveHookAddresses(HANDLE process,
         }
     }
     for (const HookDef &hook : *hooks) {
-        const auto it = locators.find(hookIdentity(hook).toStdString());
+        const auto it = locators.find(NBVmp_Model_HookIdentity(hook).toStdString());
         if (it != locators.end()) {
             addField(it->second.field);
         }
@@ -1047,7 +1065,7 @@ bool resolveHookAddresses(HANDLE process,
 
     std::vector<QString> unresolved;
     for (HookDef &hook : *hooks) {
-        const auto locIt = locators.find(hookIdentity(hook).toStdString());
+        const auto locIt = locators.find(NBVmp_Model_HookIdentity(hook).toStdString());
         if (locIt == locators.end()) {
             continue;
         }
@@ -1080,7 +1098,7 @@ bool resolveHookAddresses(HANDLE process,
         }
         hook.address = *addr;
         const QByteArray current = readMem(process, hook.address, 5);
-        const auto compat = hookBytesCompatible(hook.address, current, hook, base, size);
+        const auto compat = NBVmp_Model_HookBytesCompatible(hook.address, current, hook, base, size);
         hook.resolvedBy = QStringLiteral("%1:%2:%3:%4:%5")
                               .arg(locator.group,
                                    QString::fromLatin1(locator.field),
@@ -1097,22 +1115,26 @@ bool resolveHookAddresses(HANDLE process,
     return true;
 }
 
-QByteArray makeJmp5(quint64 from, quint64 to, bool *ok)
+NB_NOINLINE QByteArray NBVmp_Model_MakeJmp5(quint64 from, quint64 to, bool *ok)
 {
+    NB_VMP_ULTRA("NB.Model.MakeJmp5");
     const qint64 rel64 = qint64(to) - qint64(from + 5);
     if (rel64 < INT32_MIN || rel64 > INT32_MAX) {
         *ok = false;
+        NB_VMP_END();
         return {};
     }
     *ok = true;
     QByteArray out;
     out.append(char(0xE9));
     appendI32(&out, qint32(rel64));
+    NB_VMP_END();
     return out;
 }
 
-QByteArray makeBoolShellcode(quint64 callTarget, quint64 returnAddr, quint64 counterAddr, int value)
+NB_NOINLINE QByteArray NBVmp_Model_MakeBoolShellcode(quint64 callTarget, quint64 returnAddr, quint64 counterAddr, int value)
 {
+    NB_VMP_ULTRA("NB.Model.MakeBoolShellcode");
     QByteArray out = incCounter(counterAddr);
     out.append(char(0xBA));
     appendU32(&out, quint32(value & 0xFF));
@@ -1120,11 +1142,13 @@ QByteArray makeBoolShellcode(quint64 callTarget, quint64 returnAddr, quint64 cou
     out.append("\x41\xFF\xD3", 3);
     out.append(movR11Imm(returnAddr));
     out.append("\x41\xFF\xE3", 3);
+    NB_VMP_END();
     return out;
 }
 
-QByteArray makeStringArgShellcode(quint64 callTarget, quint64 returnAddr, quint64 counterAddr, quint64 stringObjAddr)
+NB_NOINLINE QByteArray NBVmp_Model_MakeStringArgShellcode(quint64 callTarget, quint64 returnAddr, quint64 counterAddr, quint64 stringObjAddr)
 {
+    NB_VMP_ULTRA("NB.Model.MakeStringArgShellcode");
     QByteArray out = incCounter(counterAddr);
     out.append("\x48\xBA", 2);
     appendU64(&out, stringObjAddr);
@@ -1132,6 +1156,7 @@ QByteArray makeStringArgShellcode(quint64 callTarget, quint64 returnAddr, quint6
     out.append("\x41\xFF\xD3", 3);
     out.append(movR11Imm(returnAddr));
     out.append("\x41\xFF\xE3", 3);
+    NB_VMP_END();
     return out;
 }
 
@@ -1162,12 +1187,13 @@ struct AsmBuilder {
     }
 };
 
-QByteArray makeSkinDataShellcode(quint64 callTarget,
-                                 quint64 returnAddr,
-                                 quint64 counterAddr,
-                                 quint64 replacementAddr,
-                                 int replacementSize)
+NB_NOINLINE QByteArray NBVmp_Model_MakeSkinDataShellcode(quint64 callTarget,
+                                                          quint64 returnAddr,
+                                                          quint64 counterAddr,
+                                                          quint64 replacementAddr,
+                                                          int replacementSize)
 {
+    NB_VMP_ULTRA("NB.Model.MakeSkinDataShellcode");
     AsmBuilder a;
     a.append(incCounter(counterAddr));
     a.append(QByteArray::fromHex("4989D2"));
@@ -1199,7 +1225,9 @@ QByteArray makeSkinDataShellcode(quint64 callTarget,
     a.append(QByteArray::fromHex("41FFD3"));
     a.append(movR11Imm(returnAddr));
     a.append(QByteArray::fromHex("41FFE3"));
-    return a.build();
+    const QByteArray result = a.build();
+    NB_VMP_END();
+    return result;
 }
 
 std::optional<quint64> makeRemoteStdStringBytes(HANDLE process, const QByteArray &data)
@@ -1298,12 +1326,12 @@ bool installHook(HANDLE process,
                  const RemotePayload &remote,
                  quint64 *counterOut)
 {
-    const quint64 addr = hookAddress(base, hook);
+    const quint64 addr = NBVmp_Model_HookAddress(base, hook);
     const QByteArray current = readMem(process, addr, 5);
     if (current.startsWith(char(0xE9))) {
         return false;
     }
-    const auto compat = hookBytesCompatible(addr, current, hook, base, moduleSize);
+    const auto compat = NBVmp_Model_HookBytesCompatible(addr, current, hook, base, moduleSize);
     if (!compat.first) {
         return false;
     }
@@ -1312,7 +1340,7 @@ bool installHook(HANDLE process,
         return false;
     }
     const quint64 counterAddr = *shellAddr + hook.shellSize - 0x10;
-    const quint64 callTarget = callTargetFromRel32(addr, current);
+    const quint64 callTarget = NBVmp_Model_CallTargetFromRel32(addr, current);
     const quint64 returnAddr = addr + 5;
 
     QByteArray shell;
@@ -1329,23 +1357,23 @@ bool installHook(HANDLE process,
     };
 
     if (hook.kind == HookKind::Bool || hook.kind == HookKind::UInt32) {
-        shell = makeBoolShellcode(callTarget, returnAddr, counterAddr, hook.value);
+        shell = NBVmp_Model_MakeBoolShellcode(callTarget, returnAddr, counterAddr, hook.value);
     } else if (hook.kind == HookKind::SkinData) {
         if (remote.fakeSkinData) {
-            shell = makeStringArgShellcode(callTarget, returnAddr, counterAddr, remote.fakeSkinData);
+            shell = NBVmp_Model_MakeStringArgShellcode(callTarget, returnAddr, counterAddr, remote.fakeSkinData);
         } else {
-            shell = makeSkinDataShellcode(callTarget,
-                                          returnAddr,
-                                          counterAddr,
-                                          remote.replacementSkin,
-                                          remote.replacementSkinSize);
+            shell = NBVmp_Model_MakeSkinDataShellcode(callTarget,
+                                                       returnAddr,
+                                                       counterAddr,
+                                                       remote.replacementSkin,
+                                                       remote.replacementSkinSize);
         }
     } else {
         const quint64 str = remoteStringForKind();
         if (!str) {
             return false;
         }
-        shell = makeStringArgShellcode(callTarget, returnAddr, counterAddr, str);
+        shell = NBVmp_Model_MakeStringArgShellcode(callTarget, returnAddr, counterAddr, str);
     }
 
     if (shell.size() >= hook.shellSize - 0x20) {
@@ -1357,7 +1385,7 @@ bool installHook(HANDLE process,
     QByteArray zero(8, '\0');
     writeMem(process, counterAddr, zero, false);
     bool jmpOk = false;
-    const QByteArray jmp = makeJmp5(addr, *shellAddr, &jmpOk);
+    const QByteArray jmp = NBVmp_Model_MakeJmp5(addr, *shellAddr, &jmpOk);
     if (!jmpOk || !writeMem(process, addr, jmp, true)) {
         return false;
     }
@@ -1391,9 +1419,9 @@ bool probeProcessReady(DWORD pid, const PayloadConfig &cfg)
         return false;
     }
     for (const HookDef &hook : hooks) {
-        const quint64 addr = hookAddress(module->base, hook);
+        const quint64 addr = NBVmp_Model_HookAddress(module->base, hook);
         const QByteArray current = readMem(process.h, addr, 5);
-        if (!hookBytesCompatible(addr, current, hook, module->base, module->size).first) {
+        if (!NBVmp_Model_HookBytesCompatible(addr, current, hook, module->base, module->size).first) {
             return false;
         }
     }
@@ -1448,9 +1476,9 @@ bool patchProcess(DWORD pid, const PayloadConfig &cfg)
             if (counters.find(hook.name.toStdString()) != counters.end()) {
                 continue;
             }
-            const quint64 addr = hookAddress(module->base, hook);
+            const quint64 addr = NBVmp_Model_HookAddress(module->base, hook);
             const QByteArray current = readMem(process.h, addr, 5);
-            if (!hookBytesCompatible(addr, current, hook, module->base, module->size).first) {
+            if (!NBVmp_Model_HookBytesCompatible(addr, current, hook, module->base, module->size).first) {
                 continue;
             }
             quint64 counter = 0;

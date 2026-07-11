@@ -62,8 +62,8 @@ def filter_map():
     for line in lines[header_end:]:
         if not line.startswith(' 0001:'):
             continue
-        # Must match at least one critical pattern
-        if not any(re.search(p, line) for p in CRITICAL_PATTERNS):
+        # Keep every deliberate VMP leaf in addition to historical critical functions.
+        if 'NBVmp_' not in line and not any(re.search(p, line) for p in CRITICAL_PATTERNS):
             continue
         # Must not match any exclude pattern
         if any(re.search(p, line) for p in EXCLUDE_PATTERNS):

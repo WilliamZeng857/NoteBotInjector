@@ -1,4 +1,5 @@
 #include "updater.h"
+#include "vmp_defs.h"
 #include "crypto_utils.h"
 
 #include <QTcpSocket>
@@ -95,15 +96,21 @@ QString randomNonceHex(int bytes = 16)
     return QString::fromLatin1(nonce.toHex()).toLower();
 }
 
-QString hashBytesHex(const QByteArray &bytes, QCryptographicHash::Algorithm alg)
+NB_NOINLINE QString NBVmp_Injector_HashBytesHex(const QByteArray &bytes, QCryptographicHash::Algorithm alg)
 {
-    return QString::fromLatin1(QCryptographicHash::hash(bytes, alg).toHex()).toLower();
+    NB_VMP_VIRTUALIZE("NB.Injector.HashBytesHex");
+    const QString result = QString::fromLatin1(QCryptographicHash::hash(bytes, alg).toHex()).toLower();
+    NB_VMP_END();
+    return result;
 }
 
-bool isIpLiteralHost(const QString &host)
+NB_NOINLINE bool NBVmp_Injector_IsIpLiteralHost(const QString &host)
 {
+    NB_VMP_MUTATE("NB.Injector.IsIpLiteralHost");
     QHostAddress address;
-    return address.setAddress(host);
+    const bool isLiteral = address.setAddress(host);
+    NB_VMP_END();
+    return isLiteral;
 }
 
 bool verifyPinnedDownloadCertificate(HINTERNET request, QString *error)
@@ -121,7 +128,7 @@ bool verifyPinnedDownloadCertificate(HINTERNET request, QString *error)
                              static_cast<int>(cert->cbCertEncoded));
     CertFreeCertificateContext(cert);
 
-    const QString actualSha256 = hashBytesHex(certDer, QCryptographicHash::Sha256);
+    const QString actualSha256 = NBVmp_Injector_HashBytesHex(certDer, QCryptographicHash::Sha256);
     if (actualSha256 != QString::fromLatin1(PINNED_DOWNLOAD_CERT_SHA256)) {
         if (error) {
             *error = QStringLiteral("服务器下载证书指纹不匹配 expected=%1 actual=%2")
@@ -150,15 +157,19 @@ QString hashFileHex(const QString &path, QCryptographicHash::Algorithm alg)
     return QString::fromLatin1(hash.result().toHex()).toLower();
 }
 
-QString signatureToHex(const NBAuth::FixedSig256 &signature)
+NB_NOINLINE QString NBVmp_Injector_SignatureToHex(const NBAuth::FixedSig256 &signature)
 {
-    return QByteArray(reinterpret_cast<const char *>(signature.data()),
-                      static_cast<int>(signature.size())).toHex().toLower();
+    NB_VMP_MUTATE("NB.Injector.SignatureToHex");
+    const QString result = QByteArray(reinterpret_cast<const char *>(signature.data()),
+                                      static_cast<int>(signature.size())).toHex().toLower();
+    NB_VMP_END();
+    return result;
 }
 
-QString canonicalJsonString(const QList<QPair<QString, QString>> &stringFields,
-                            const QList<QPair<QString, qint64>> &integerFields)
+NB_NOINLINE QString NBVmp_Injector_CanonicalJsonString(const QList<QPair<QString, QString>> &stringFields,
+                                                        const QList<QPair<QString, qint64>> &integerFields)
 {
+    NB_VMP_VIRTUALIZE("NB.Injector.CanonicalJsonString");
     QStringList parts;
     parts.reserve(stringFields.size() + integerFields.size());
     for (const auto &field : stringFields) {
@@ -169,7 +180,9 @@ QString canonicalJsonString(const QList<QPair<QString, QString>> &stringFields,
         parts.append(QStringLiteral("\"%1\":%2")
                          .arg(field.first, QString::number(field.second)));
     }
-    return QStringLiteral("{%1}").arg(parts.join(QLatin1Char(',')));
+    const QString result = QStringLiteral("{%1}").arg(parts.join(QLatin1Char(',')));
+    NB_VMP_END();
+    return result;
 }
 
 QString updateStateLicensePath()
@@ -269,7 +282,7 @@ bool buildManifestAuthContext(const QString &currentMainVersion,
         return false;
     }
 
-    const QString canonical = canonicalJsonString(
+    const QString canonical = NBVmp_Injector_CanonicalJsonString(
         {
             {QStringLiteral("cmd"), QStringLiteral("update_manifest_v3")},
             {QStringLiteral("client_kind"), QStringLiteral("NoteBotInjector")},
@@ -301,14 +314,17 @@ bool buildManifestAuthContext(const QString &currentMainVersion,
         return false;
     }
 
-    out.deviceSignatureHex = signatureToHex(signature);
+    out.deviceSignatureHex = NBVmp_Injector_SignatureToHex(signature);
     out.hasVerifiedLicense = true;
     return true;
 }
 
-QString safeArtifactFileName(const QString &name)
+NB_NOINLINE QString NBVmp_Injector_SafeArtifactFileName(const QString &name)
 {
-    return QFileInfo(name.trimmed()).fileName();
+    NB_VMP_MUTATE("NB.Injector.SafeArtifactFileName");
+    const QString result = QFileInfo(name.trimmed()).fileName();
+    NB_VMP_END();
+    return result;
 }
 
 QString winHttpError(const QString &where)
@@ -417,7 +433,7 @@ HttpDownloadResult httpGetNoProxy(const QUrl &url,
     const bool isHttps = (parts.nScheme == INTERNET_SCHEME_HTTPS);
     const QString requestHost =
         QString::fromWCharArray(parts.lpszHostName, static_cast<int>(parts.dwHostNameLength));
-    const bool pinnedIpDownload = isHttps && isIpLiteralHost(requestHost);
+    const bool pinnedIpDownload = isHttps && NBVmp_Injector_IsIpLiteralHost(requestHost);
     HINTERNET request = WinHttpOpenRequest(connect,
                                            L"GET",
                                            pathW.c_str(),
@@ -889,7 +905,7 @@ QString Updater::downloadArtifact(const ArtifactInfo &artifact,
         return QString();
     }
 
-    const QString fileName = safeArtifactFileName(effectiveArtifact.fileName);
+    const QString fileName = NBVmp_Injector_SafeArtifactFileName(effectiveArtifact.fileName);
     if (fileName.isEmpty() || !effectiveArtifact.downloadUrl.isValid() ||
         effectiveArtifact.downloadUrl.host().isEmpty()) {
         L(QStringLiteral("[UPD] [ERR] 更新产物元数据无效"));
@@ -923,14 +939,14 @@ QString Updater::downloadArtifact(const ArtifactInfo &artifact,
         return QString();
     }
     if (!effectiveArtifact.fileSha256.isEmpty()) {
-        const QString actualSha256 = hashBytesHex(http.bytes, QCryptographicHash::Sha256);
+        const QString actualSha256 = NBVmp_Injector_HashBytesHex(http.bytes, QCryptographicHash::Sha256);
         if (actualSha256 != effectiveArtifact.fileSha256) {
             L(QStringLiteral("[UPD] [ERR] 文件校验失败：%1").arg(fileName));
             return QString();
         }
     }
     if (!effectiveArtifact.fileMd5.isEmpty()) {
-        const QString actualMd5 = hashBytesHex(http.bytes, QCryptographicHash::Md5);
+        const QString actualMd5 = NBVmp_Injector_HashBytesHex(http.bytes, QCryptographicHash::Md5);
         if (actualMd5 != effectiveArtifact.fileMd5) {
             L(QStringLiteral("[UPD] [ERR] 文件校验失败：%1").arg(fileName));
             return QString();
