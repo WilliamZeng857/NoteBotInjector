@@ -39,11 +39,19 @@ NB_NOINLINE QString NBVmp_V3_HashKeySha256(const QString &normalizedKey)
     return out;
 }
 
+NB_NOINLINE bool NBVmp_V3_KeyHashLongEnough(qsizetype length)
+{
+    NB_VMP_MUTATE("NB.V3.KeyHashLongEnough");
+    const bool out = length >= 16;
+    NB_VMP_END();
+    return out;
+}
+
 NB_NOINLINE QString NBVmp_V3_MakeKeyId(const QString &keyHash)
 {
     NB_VMP_MUTATE("NB.V3.MakeKeyId");
     QString out;
-    if (keyHash.size() >= 16) {
+    if (NBVmp_V3_KeyHashLongEnough(keyHash.size())) {
         out = QStringLiteral("kid_%1").arg(keyHash.left(16));
     }
     NB_VMP_END();

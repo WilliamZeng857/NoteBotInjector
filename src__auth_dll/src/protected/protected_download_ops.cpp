@@ -14,18 +14,41 @@ static QString hashBytesHex(const QByteArray &bytes, QCryptographicHash::Algorit
 static QString safeFileNamePlain(const QString &name)
 {
     QString fileName = QFileInfo(name.trimmed()).fileName();
-    if (!fileName.endsWith(".dll", Qt::CaseInsensitive)) {
+    if (!NBVmp_Dll_SafeFileNameAllowed(fileName.endsWith(".dll", Qt::CaseInsensitive))) {
         fileName.clear();
     }
     return fileName;
 }
 
-NB_NOINLINE QString NBVmp_Dll_SafeFileName(const QString &name)
+NB_NOINLINE bool NBVmp_Dll_SafeFileNameAllowed(bool hasDllSuffix)
 {
-    NB_VMP_MUTATE("NB.Dll.SafeFileName");
-    QString fileName = safeFileNamePlain(name);
+    NB_VMP_MUTATE("NB.Dll.SafeFileNameAllowed");
     NB_VMP_END();
-    return fileName;
+    return hasDllSuffix;
+}
+
+NB_NOINLINE int NBVmp_Dll_MetadataIssue(bool hasFileName,
+                                        bool validUrl,
+                                        bool positiveSize,
+                                        bool md5Matches)
+{
+    NB_VMP_VIRTUALIZE("NB.Dll.MetadataIssue");
+    const int issue = !hasFileName ? 1 : !validUrl ? 2 : !positiveSize ? 3 : !md5Matches ? 4 : 0;
+    NB_VMP_END();
+    return issue;
+}
+
+NB_NOINLINE bool NBVmp_Dll_DownloadedSizeMatches(qint64 expectedSize, qint64 actualSize)
+{
+    NB_VMP_ULTRA("NB.Dll.DownloadedSizeMatches");
+    const bool matches = expectedSize == actualSize;
+    NB_VMP_END();
+    return matches;
+}
+
+QString NBVmp_Dll_SafeFileName(const QString &name)
+{
+    return safeFileNamePlain(name);
 }
 
 NB_NOINLINE bool NBVmp_Dll_ParseSignedMetadata(const QJsonObject &resp,
@@ -34,7 +57,6 @@ NB_NOINLINE bool NBVmp_Dll_ParseSignedMetadata(const QJsonObject &resp,
                                                SignedDllMetadata &out,
                                                QString &error)
 {
-    NB_VMP_VIRTUALIZE("NB.Dll.ParseSignedMetadata");
     SignedDllMetadata info;
     info.fileName = safeFileNamePlain(resp["dll_name"].toString().trimmed());
     if (info.fileName.isEmpty()) info.fileName = safeFileNamePlain(requestedName);
@@ -44,24 +66,24 @@ NB_NOINLINE bool NBVmp_Dll_ParseSignedMetadata(const QJsonObject &resp,
     info.url = QUrl(resp["download_url"].toString().trimmed());
     info.expiresIn = resp["expires_in"].toInt(0);
 
-    bool ok = true;
+    const int issue = NBVmp_Dll_MetadataIssue(
+        !info.fileName.isEmpty(),
+        info.url.isValid() && !info.url.scheme().isEmpty() && !info.url.host().isEmpty(),
+        info.size > 0,
+        expectedMd5.isEmpty() || info.md5.isEmpty() || info.md5 == expectedMd5);
+    bool ok = issue == 0;
     error.clear();
-    if (info.fileName.isEmpty()) {
-        ok = false;
+    if (issue == 1) {
         error = "invalid dll_name";
-    } else if (!info.url.isValid() || info.url.scheme().isEmpty() || info.url.host().isEmpty()) {
-        ok = false;
+    } else if (issue == 2) {
         error = "invalid download_url";
-    } else if (info.size <= 0) {
-        ok = false;
+    } else if (issue == 3) {
         error = "invalid dll_size";
-    } else if (!expectedMd5.isEmpty() && !info.md5.isEmpty() && info.md5 != expectedMd5) {
-        ok = false;
+    } else if (issue == 4) {
         error = QString("metadata md5 mismatch expected=%1 actual=%2").arg(expectedMd5, info.md5);
     }
 
     if (ok) out = info;
-    NB_VMP_END();
     return ok;
 }
 
@@ -72,13 +94,12 @@ NB_NOINLINE bool NBVmp_Dll_VerifyDownloadedBytes(const SignedDllMetadata &info,
                                                  QString &actualMd5,
                                                  QString &error)
 {
-    NB_VMP_ULTRA("NB.Dll.VerifyDownloadedBytes");
     bool ok = true;
     error.clear();
     actualSha256.clear();
     actualMd5.clear();
 
-    if (bytes.size() != info.size) {
+    if (!NBVmp_Dll_DownloadedSizeMatches(info.size, bytes.size())) {
         ok = false;
         error = QString("size mismatch expected=%1 actual=%2").arg(info.size).arg(bytes.size());
     }
@@ -105,7 +126,6 @@ NB_NOINLINE bool NBVmp_Dll_VerifyDownloadedBytes(const SignedDllMetadata &info,
         }
     }
 
-    NB_VMP_END();
     return ok;
 }
 

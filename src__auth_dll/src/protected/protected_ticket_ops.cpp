@@ -164,18 +164,29 @@ NB_NOINLINE bool NBVmp_Ticket_DecryptWrapper(const QByteArray &wrapperKey,
     return true;
 }
 
-NB_NOINLINE bool NBVmp_Ticket_ParseWrapperJson(const QByteArray &wrapperPlaintext,
-                                               ParsedWrapperTicket &out,
-                                               QString *error)
+NB_NOINLINE bool NBVmp_Ticket_WrapperFieldsAllowed(int wrapperVersion,
+                                                    quint32 targetPid,
+                                                    bool magicMatches,
+                                                    bool hasTicketSha,
+                                                    bool hasPayload,
+                                                    bool hasSignature)
 {
-    NB_VMP_VIRTUALIZE("NB.Ticket.ParseWrapperJson");
+    NB_VMP_VIRTUALIZE("NB.Ticket.WrapperFieldsAllowed");
+    const bool allowed = magicMatches && wrapperVersion == 3 && targetPid != 0 && hasTicketSha && hasPayload && hasSignature;
+    NB_VMP_END();
+    return allowed;
+}
+
+bool NBVmp_Ticket_ParseWrapperJson(const QByteArray &wrapperPlaintext,
+                                   ParsedWrapperTicket &out,
+                                   QString *error)
+{
     out = ParsedWrapperTicket{};
     const QJsonObject obj = parseJsonObject(wrapperPlaintext, error);
     if (obj.isEmpty()) {
         if (error && error->isEmpty()) {
             *error = QStringLiteral("wrapper_invalid:wrapper_json_invalid");
         }
-        NB_VMP_END();
         return false;
     }
 
@@ -192,35 +203,48 @@ NB_NOINLINE bool NBVmp_Ticket_ParseWrapperJson(const QByteArray &wrapperPlaintex
     out.serverTicketSignature =
         obj.value(QStringLiteral("server_ticket_signature")).toString().trimmed().toLower();
 
-    if (out.magic != QStringLiteral("NB_TICKET_WRAP_V3") ||
-        out.wrapperVersion != 3 ||
-        out.targetPid == 0 ||
-        out.ticketSha256.isEmpty() ||
-        out.serverTicketPayload.isEmpty() ||
-        out.serverTicketSignature.isEmpty()) {
+    if (!NBVmp_Ticket_WrapperFieldsAllowed(
+            out.wrapperVersion,
+            out.targetPid,
+            out.magic == QStringLiteral("NB_TICKET_WRAP_V3"),
+            !out.ticketSha256.isEmpty(),
+            !out.serverTicketPayload.isEmpty(),
+            !out.serverTicketSignature.isEmpty())) {
         if (error) {
             *error = QStringLiteral("wrapper_invalid:wrapper_fields_invalid");
         }
-        NB_VMP_END();
         return false;
     }
 
-    NB_VMP_END();
     return true;
 }
 
-NB_NOINLINE bool NBVmp_Ticket_ParseServerTicket(const QString &payload,
-                                                ParsedServerTicket &out,
-                                                QString *error)
+NB_NOINLINE bool NBVmp_Ticket_ServerFieldsAllowed(int version,
+                                                   bool magicMatches,
+                                                   bool algorithmMatches,
+                                                   bool hasSessionId,
+                                                   bool hasTicketId,
+                                                   bool hasDllSha256,
+                                                   bool hasIssuedAt,
+                                                   bool hasExpiresAt,
+                                                   qint64 ttlMs)
 {
-    NB_VMP_VIRTUALIZE("NB.Ticket.ParseServerTicket");
+    NB_VMP_VIRTUALIZE("NB.Ticket.ServerFieldsAllowed");
+    const bool allowed = magicMatches && version == 3 && algorithmMatches && hasSessionId && hasTicketId && hasDllSha256 && hasIssuedAt && hasExpiresAt && ttlMs > 0;
+    NB_VMP_END();
+    return allowed;
+}
+
+bool NBVmp_Ticket_ParseServerTicket(const QString &payload,
+                                    ParsedServerTicket &out,
+                                    QString *error)
+{
     out = ParsedServerTicket{};
     const QJsonObject obj = parseJsonObject(payload.toUtf8(), error);
     if (obj.isEmpty()) {
         if (error && error->isEmpty()) {
             *error = QStringLiteral("wrapper_invalid:server_ticket_json_invalid");
         }
-        NB_VMP_END();
         return false;
     }
 
@@ -241,42 +265,48 @@ NB_NOINLINE bool NBVmp_Ticket_ParseServerTicket(const QString &payload,
     out.ttlMs = obj.value(QStringLiteral("ttl_ms")).toVariant().toLongLong();
     out.nonce = obj.value(QStringLiteral("nonce")).toString().trimmed().toLower();
 
-    if (out.magic != QStringLiteral("NB_INJECT_TICKET") ||
-        out.version != 3 ||
-        out.alg.compare(QStringLiteral("RS256"), Qt::CaseInsensitive) != 0 ||
-        out.sessionId.isEmpty() ||
-        out.ticketId.isEmpty() ||
-        out.dllSha256.isEmpty() ||
-        out.issuedAtServer.isEmpty() ||
-        out.expiresAtServer.isEmpty() ||
-        out.ttlMs <= 0) {
+    if (!NBVmp_Ticket_ServerFieldsAllowed(
+            out.version,
+            out.magic == QStringLiteral("NB_INJECT_TICKET"),
+            out.alg.compare(QStringLiteral("RS256"), Qt::CaseInsensitive) == 0,
+            !out.sessionId.isEmpty(),
+            !out.ticketId.isEmpty(),
+            !out.dllSha256.isEmpty(),
+            !out.issuedAtServer.isEmpty(),
+            !out.expiresAtServer.isEmpty(),
+            out.ttlMs)) {
         if (error) {
             *error = QStringLiteral("wrapper_invalid:server_ticket_fields_invalid");
         }
-        NB_VMP_END();
         return false;
     }
 
-    NB_VMP_END();
     return true;
 }
 
-NB_NOINLINE QString NBVmp_Ticket_CanonicalResultJson(const QString &sessionId,
-                                                     const QString &ticketId,
-                                                     const QString &ticketSha256,
-                                                     const QString &status,
-                                                     const QString &reason,
-                                                     const QString &dllVersion,
-                                                     qint64 processedTickMs,
-                                                     const QString &grantedTier,
-                                                     qint64 grantedFeatureFlags,
-                                                     const QString &verifiedDllSha256,
-                                                     const QString &issuedAtServer,
-                                                     const QString &expiresAtServer,
-                                                     int serverPubkeyVersion,
-                                                     const QString &serverPubkeyFingerprint)
+NB_NOINLINE qint64 NBVmp_Ticket_CanonicalResultFeatureFlags(qint64 value)
 {
-    NB_VMP_VIRTUALIZE("NB.Ticket.CanonicalResultJson");
+    NB_VMP_VIRTUALIZE("NB.Ticket.CanonicalResultFeatureFlags");
+    const qint64 normalized = value;
+    NB_VMP_END();
+    return normalized;
+}
+
+QString NBVmp_Ticket_CanonicalResultJson(const QString &sessionId,
+                                         const QString &ticketId,
+                                         const QString &ticketSha256,
+                                         const QString &status,
+                                         const QString &reason,
+                                         const QString &dllVersion,
+                                         qint64 processedTickMs,
+                                         const QString &grantedTier,
+                                         qint64 grantedFeatureFlags,
+                                         const QString &verifiedDllSha256,
+                                         const QString &issuedAtServer,
+                                         const QString &expiresAtServer,
+                                         int serverPubkeyVersion,
+                                         const QString &serverPubkeyFingerprint)
+{
     const QString json = QStringLiteral(
         "{\"magic\":\"NB_TICKET_RESULT_V3\",\"version\":3,\"session_id\":\"%1\","
         "\"ticket_id\":\"%2\",\"ticket_sha256\":\"%3\",\"status\":\"%4\","
@@ -293,13 +323,12 @@ NB_NOINLINE QString NBVmp_Ticket_CanonicalResultJson(const QString &sessionId,
              escapeJson(dllVersion),
              QString::number(processedTickMs),
              escapeJson(grantedTier),
-             QString::number(grantedFeatureFlags),
+             QString::number(NBVmp_Ticket_CanonicalResultFeatureFlags(grantedFeatureFlags)),
              escapeJson(verifiedDllSha256),
              escapeJson(issuedAtServer),
              escapeJson(expiresAtServer),
              QString::number(serverPubkeyVersion),
              escapeJson(serverPubkeyFingerprint));
-    NB_VMP_END();
     return json;
 }
 

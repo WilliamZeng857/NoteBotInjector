@@ -2,23 +2,23 @@
 # columns: category<TAB>symbol_key<TAB>module<TAB>note
 # category: mutation | virtualize | ultra
 category	symbol_key	module	note
-mutation	NBVmp_Dll_SafeFileName	protected_download_ops	sanitize requested DLL file name before download handling
-virtualize	NBVmp_Dll_ParseSignedMetadata	protected_download_ops	parse and validate signed DLL metadata envelope
-ultra	NBVmp_Dll_VerifyDownloadedBytes	protected_download_ops	verify downloaded DLL size and hashes before trust
+mutation	NBVmp_Dll_SafeFileNameAllowed	protected_download_ops	guard the normalized DLL suffix decision without protecting QFileInfo
+virtualize	NBVmp_Dll_MetadataIssue	protected_download_ops	classify signed metadata trust failures after Qt extraction
+ultra	NBVmp_Dll_DownloadedSizeMatches	protected_download_ops	guard downloaded artifact size equality before digest checks
 mutation	NBVmp_Name_IsOriginalHook	protected_name_ops	compare hook bytes against expected original prologue
 mutation	NBVmp_Name_IsAlreadyPatched	protected_name_ops	detect whether the remote hook was already patched
 virtualize	NBVmp_Name_BuildShellcode	protected_name_ops	build remote shellcode payload for custom-name injection
 mutation	NBVmp_Name_MakeJmp5	protected_name_ops	compute 5-byte relative jump patch bytes
 mutation	NBVmp_V3_NormalizeKey	protected_v3_ops	normalize plaintext key input into canonical form
 virtualize	NBVmp_V3_HashKeySha256	protected_v3_ops	derive SHA-256 key hash used by V3 state
-mutation	NBVmp_V3_MakeKeyId	protected_v3_ops	derive stable key id from key hash prefix
+mutation	NBVmp_V3_KeyHashLongEnough	protected_v3_ops	validate key-hash length before deriving the stable key id
 virtualize	NBVmp_V3_NormalizeFeatureFlags	protected_v3_ops	normalize and deduplicate V3 feature flag array
 virtualize	NBVmp_Ticket_ComputeTicketSha256	protected_ticket_ops	compute ticket sha256 from canonical server ticket payload
 ultra	NBVmp_Ticket_DeriveWrapperKey	protected_ticket_ops	derive wrapper key used by local ticket/result file chain
 ultra	NBVmp_Ticket_DecryptWrapper	protected_ticket_ops	decrypt AES-GCM wrapper for local inject ticket validation
-virtualize	NBVmp_Ticket_ParseWrapperJson	protected_ticket_ops	parse wrapper JSON fields before protected validation
-virtualize	NBVmp_Ticket_ParseServerTicket	protected_ticket_ops	parse signed inner ticket fields before protected validation
-virtualize	NBVmp_Ticket_CanonicalResultJson	protected_ticket_ops	build canonical result JSON covered by result hmac
+virtualize	NBVmp_Ticket_WrapperFieldsAllowed	protected_ticket_ops	validate extracted wrapper ticket fields
+virtualize	NBVmp_Ticket_ServerFieldsAllowed	protected_ticket_ops	validate extracted signed ticket fields
+virtualize	NBVmp_Ticket_CanonicalResultFeatureFlags	protected_ticket_ops	normalize the canonical result feature flag field
 ultra	NBVmp_Ticket_ComputeResultHmacHex	protected_ticket_ops	compute result-file hmac over canonical result JSON with wrapper key
 ultra	NBVmp_Verify_SignatureHexToFixed	protected_verify_ops	convert lower-hex server signature into fixed-size RSA signature bytes
 ultra	NBVmp_Verify_FormalServerKeyReady	protected_verify_ops	validate embedded formal server key metadata before signature verification
