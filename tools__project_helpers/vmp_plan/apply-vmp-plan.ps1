@@ -35,8 +35,9 @@ switch ($Target) {
 $mapPath = Join-Path $buildDir "$baseName.map"
 $selectionPath = Join-Path $planDir "$baseName.protect.tsv"
 $effectiveSelectionPath = $selectionPath
-$projectPath = Join-Path $buildDir "$binaryName.vmp"
 $backupMap = Join-Path $buildDir "$baseName.full.map"
+$selectorDir = Join-Path $planDir 'generated'
+$selectorPath = Join-Path $selectorDir "$baseName.apply_protection.lua"
 
 if (-not (Test-Path -LiteralPath $selectionPath)) {
     throw "Missing plan file: $selectionPath"
@@ -267,11 +268,19 @@ $rows | Set-Content -LiteralPath $generatedSelection -Encoding ASCII
 $effectiveSelectionPath = $generatedSelection
 Write-Host "Generated $baseName VMP selection: $generatedSelection"
 
-$builder = Join-Path $planDir 'build-vmp-project.ps1'
-& $builder `
-    -TemplateProjectPath $(if (Test-Path -LiteralPath $projectPath) { $projectPath } else { $null }) `
-    -SelectionPath $effectiveSelectionPath `
-    -OutputProjectPath $projectPath `
-    -InputFileName $binaryName
+$generator = Join-Path $planDir 'generate-vmp-selector.py'
+if (-not (Test-Path -LiteralPath $generator)) {
+    throw "VMP selector generator not found: $generator"
+}
 
-Write-Host "Updated VMP project: $projectPath"
+New-Item -ItemType Directory -Force -Path $selectorDir | Out-Null
+& python $generator `
+    --target $baseName `
+    --selection $effectiveSelectionPath `
+    --output $selectorPath
+if ($LASTEXITCODE -ne 0) {
+    throw "VMP selector generation failed for $baseName"
+}
+
+Write-Host "VMP project unchanged (GUI-owned): $binaryName.vmp"
+Write-Host "GUI Script: dofile([[$selectorPath]])"

@@ -56,9 +56,12 @@ loop remain ordinary coordinators.
 
 Every target emits an unoptimized-for-selection linker MAP with stable
 `NBVmp_*` symbols. One common VMP-plan generator accepts all four targets and
-generates a target-specific `.vmp` project from its TSV table. A readiness
-verifier requires that every table row resolves to exactly one marker symbol
-in the corresponding MAP and that no marker symbol is unlisted.
+generates a target-specific Lua selector from its TSV table and current MAP.
+The VMProtect `.vmp` projects remain GUI-owned empty projects: the generator
+must never add Procedure entries, names, or addresses. A readiness verifier
+requires that every table row resolves to exactly one marker symbol in the
+corresponding MAP, that no marker symbol is unlisted, and that every project
+remains free of Procedure entries.
 
 VMProtect SDK markers are opt-in. Normal developer builds leave marker macros
 as no-ops and preserve runtime behavior. A release-protection build enables
@@ -69,4 +72,6 @@ the common CMake option and points `NB_VMP_SDK_DIR` at the SDK include root.
 The readiness verifier has a static mode for source/table/CMake integrity and
 a full mode after build for MAP/table symbol resolution. The release build
 also verifies UTF-8 validity, unchanged BOM state for modified existing files,
-`git diff --check`, and all four output artifacts.
+`git diff --check`, and all four output artifacts. The user opens the current
+plain binary and matching empty project in VMProtect, pastes the generated
+`dofile(...)` loader into the project Script field, and clicks Compile manually.

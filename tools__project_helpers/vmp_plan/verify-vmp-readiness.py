@@ -15,6 +15,8 @@ TARGETS = {
     "Injector": {
         "table": PLAN_DIR / "NoteBotInjector.protect.tsv",
         "map": ROOT / "build__injector_exe_cache" / "NoteBotInjector.map",
+        "project": ROOT / "build__injector_exe_cache" / "NoteBotInjector.exe.vmp",
+        "selector": PLAN_DIR / "generated" / "NoteBotInjector.apply_protection.lua",
         "sources": [ROOT / "src__injector_exe" / "backend.cpp",
                     ROOT / "src__injector_exe" / "updater.cpp",
                     ROOT / "src__injector_exe" / "win32injector.cpp"],
@@ -22,16 +24,22 @@ TARGETS = {
     "Updater": {
         "table": PLAN_DIR / "NoteBotUpdater.protect.tsv",
         "map": ROOT / "build__injector_exe_cache" / "NoteBotUpdater.map",
+        "project": ROOT / "build__injector_exe_cache" / "NoteBotUpdater.exe.vmp",
+        "selector": PLAN_DIR / "generated" / "NoteBotUpdater.apply_protection.lua",
         "sources": [ROOT / "src__updater_exe" / "updater_main.cpp"],
     },
     "Auth": {
         "table": PLAN_DIR / "NoteBotAuth.protect.tsv",
         "map": ROOT / "build__auth_dll_cache" / "NoteBotAuth.map",
+        "project": ROOT / "build__auth_dll_cache" / "NoteBotAuth.dll.vmp",
+        "selector": PLAN_DIR / "generated" / "NoteBotAuth.apply_protection.lua",
         "sources": list((ROOT / "src__auth_dll").rglob("*.cpp")),
     },
     "Model": {
         "table": PLAN_DIR / "NoteBotModel.protect.tsv",
         "map": ROOT / "build__injector_exe_cache" / "NoteBotModel.map",
+        "project": ROOT / "dist__model_runtime_artifacts" / "NoteBotModel.dll.vmp",
+        "selector": PLAN_DIR / "generated" / "NoteBotModel.apply_protection.lua",
         "sources": [ROOT / "src__model_dll" / "src" / "model_api.cpp"],
     },
 }
@@ -94,6 +102,33 @@ def read_table(path: Path) -> list[str]:
     return symbols
 
 
+def verify_empty_project(path: Path, target: str) -> list[str]:
+    if not path.exists():
+        return [f"{target}: missing GUI-owned project {path}"]
+    project = path.read_text(encoding="utf-8")
+    errors: list[str] = []
+    if "<Document" not in project or "<Protection" not in project:
+        errors.append(f"{target}: invalid VMP project XML")
+    if "<Procedure" in project or "MapAddress=" in project:
+        errors.append(f"{target}: VMP project must remain empty; Procedure entries are forbidden")
+    return errors
+
+
+def verify_selector(path: Path, target: str, expected_count: int) -> list[str]:
+    if not path.exists():
+        return [f"{target}: missing generated GUI selector {path}"]
+    selector = path.read_text(encoding="utf-8")
+    errors: list[str] = []
+    if "function OnBeforeCompilation()" not in selector:
+        errors.append(f"{target}: selector lacks OnBeforeCompilation callback")
+    if "addByAddress" not in selector or "functions.clear" not in selector:
+        errors.append(f"{target}: selector lacks VMProtect selection lifecycle")
+    actual_count = selector.count('raw_symbol = "')
+    if actual_count != expected_count:
+        errors.append(f"{target}: selector contains {actual_count} entries, expected {expected_count}")
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-maps", action="store_true")
@@ -115,6 +150,9 @@ def main() -> int:
         except ValueError as exc:
             errors.append(str(exc))
             continue
+
+        errors.extend(verify_empty_project(config["project"], target))
+        errors.extend(verify_selector(config["selector"], target, len(expected)))
 
         source_text = "\n".join(path.read_text(encoding="utf-8-sig")
                                 for path in config["sources"] if path.exists())
