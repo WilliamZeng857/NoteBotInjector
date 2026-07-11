@@ -96,6 +96,25 @@ NB_NOINLINE bool NBVmp_Updater_HashesMatch(const QString &sourceHash, const QStr
     return match;
 }
 
+NB_NOINLINE bool NBVmp_Updater_IsReplaceActionSupported(const QString &action)
+{
+    NB_VMP_MUTATE("NB.Updater.IsReplaceActionSupported");
+    const bool supported = action == QStringLiteral("--replace-main") ||
+                           action == QStringLiteral("--replace-auth-dll") ||
+                           action == QStringLiteral("--replace-file");
+    NB_VMP_END();
+    return supported;
+}
+
+NB_NOINLINE bool NBVmp_Updater_RestartAllowedForAction(const QString &action,
+                                                        const QString &restartTarget)
+{
+    NB_VMP_MUTATE("NB.Updater.RestartAllowedForAction");
+    const bool allowed = action != QStringLiteral("--replace-auth-dll") || restartTarget.isEmpty();
+    NB_VMP_END();
+    return allowed;
+}
+
 bool waitForExit(quint32 pid, QString *errorMessage)
 {
     if (pid == 0) {
@@ -246,13 +265,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         ? requestedPid
         : NBVmp_Updater_ArgUInt(args, QStringLiteral("--wait-pid"));
 
-    if (action != QStringLiteral("--replace-main") &&
-        action != QStringLiteral("--replace-auth-dll") &&
-        action != QStringLiteral("--replace-file")) {
+    if (!NBVmp_Updater_IsReplaceActionSupported(action)) {
         return fail(action, src, dst, backup, pid, QStringLiteral("不支持的命令"));
     }
 
-    if (action == QStringLiteral("--replace-auth-dll") && !restart.isEmpty()) {
+    if (!NBVmp_Updater_RestartAllowedForAction(action, restart)) {
         return fail(action, src, dst, backup, pid, QStringLiteral("replace-auth-dll 不允许重启参数"));
     }
 

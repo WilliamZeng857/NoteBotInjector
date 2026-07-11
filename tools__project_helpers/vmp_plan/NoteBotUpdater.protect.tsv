@@ -4,3 +4,5 @@ category	symbol_key	module	note
 mutation	NBVmp_Updater_ArgValue	updater_main	read a named updater argument without changing flow
 mutation	NBVmp_Updater_ArgUInt	updater_main	parse the bounded updater process identifier
 ultra	NBVmp_Updater_HashesMatch	updater_main	validate copied output against source digest before completion
+mutation	NBVmp_Updater_IsReplaceActionSupported	updater_main	allow only the known updater replacement actions
+mutation	NBVmp_Updater_RestartAllowedForAction	updater_main	forbid restart arguments for Auth DLL replacement

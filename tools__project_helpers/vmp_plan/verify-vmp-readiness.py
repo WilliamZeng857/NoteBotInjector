@@ -41,6 +41,38 @@ MAP_REQUIRED = (
     "/MAP:NoteBotUpdater.map",
     "/MAP:NoteBotModel.map",
 )
+CORE_REQUIRED = {
+    "Injector": {
+        "NBVmp_Injector_AuthAbiMatches",
+        "NBVmp_Injector_ModelAbiMatches",
+        "NBVmp_Injector_ProtectedLicenseEnvelopeReady",
+        "NBVmp_Injector_ManifestIdentityReady",
+        "NBVmp_Injector_SignManifestPayload",
+    },
+    "Updater": {
+        "NBVmp_Updater_IsReplaceActionSupported",
+        "NBVmp_Updater_RestartAllowedForAction",
+    },
+    "Auth": {
+        "NBVmp_Verify_SignDevicePayload",
+        "NBVmp_Verify_TicketResponseReady",
+        "NBVmp_Verify_WrapperKeyReady",
+        "NBVmp_Verify_InjectResultEnvelopeMatches",
+    },
+    "Model": {
+        "NBVmp_Model_RuntimeModeRequested",
+        "NBVmp_Model_ModelAssetsConfigured",
+        "NBVmp_Model_SkinDimensionsAllowed",
+        "NBVmp_Model_UsablePayloadReady",
+    },
+}
+FORBIDDEN_HOT_PATH_MARKERS = (
+    "NBVmp_Model_PatchProcess",
+    "NBVmp_Model_InstallHook",
+    "NBVmp_Injector_DownloadArtifact",
+    "NBVmp_Injector_DoInject",
+    "NBVmp_Updater_ReplaceFile",
+)
 ROW_RE = re.compile(r"^(mutation|virtualize|ultra|super)\t(NBVmp_[^\t]+)\t[^\t]+\t.+$")
 MAP_SYMBOL_RE = re.compile(r"^\s*[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}\s+(\?NBVmp_\S*)\s+[0-9A-Fa-f]{16}\s+(?:f\s+)?\S+\.obj\s*$")
 
@@ -86,6 +118,9 @@ def main() -> int:
 
         source_text = "\n".join(path.read_text(encoding="utf-8-sig")
                                 for path in config["sources"] if path.exists())
+        for symbol in CORE_REQUIRED[target]:
+            if symbol not in source_text:
+                errors.append(f"{target}: core protection marker absent from source: {symbol}")
         for symbol in expected:
             if symbol not in source_text:
                 errors.append(f"{target}: table symbol absent from source: {symbol}")
@@ -108,6 +143,16 @@ def main() -> int:
         for symbol in map_symbols:
             if not any(expected_symbol in symbol for expected_symbol in expected):
                 errors.append(f"{target}: unlisted protected symbol in map: {symbol}")
+
+    all_source_text = "\n".join(
+        path.read_text(encoding="utf-8-sig")
+        for config in TARGETS.values()
+        for path in config["sources"]
+        if path.exists()
+    )
+    for symbol in FORBIDDEN_HOT_PATH_MARKERS:
+        if symbol in all_source_text:
+            errors.append(f"hot-path function must remain unprotected: {symbol}")
 
     if errors:
         print("VMP readiness verification failed:")

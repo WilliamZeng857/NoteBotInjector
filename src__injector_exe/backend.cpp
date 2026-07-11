@@ -51,6 +51,24 @@ constexpr int kExpectedAuthAbiVersion = 1;
 constexpr int kExpectedModelProtocolVersion = 1;
 constexpr int kExpectedModelAbiVersion = 2;
 
+static NB_NOINLINE bool NBVmp_Injector_AuthAbiMatches(int protocolVersion, int abiVersion)
+{
+    NB_VMP_ULTRA("NB.Injector.AuthAbiMatches");
+    const bool ok = protocolVersion == kExpectedAuthProtocolVersion &&
+                    abiVersion == kExpectedAuthAbiVersion;
+    NB_VMP_END();
+    return ok;
+}
+
+static NB_NOINLINE bool NBVmp_Injector_ModelAbiMatches(int protocolVersion, int abiVersion)
+{
+    NB_VMP_ULTRA("NB.Injector.ModelAbiMatches");
+    const bool ok = protocolVersion == kExpectedModelProtocolVersion &&
+                    abiVersion == kExpectedModelAbiVersion;
+    NB_VMP_END();
+    return ok;
+}
+
 static NB_NOINLINE QString NBVmp_Injector_NormalizeLicenseKeyForIdentity(const QString &key)
 {
     NB_VMP_MUTATE("NB.Injector.NormalizeLicenseKeyForIdentity");
@@ -1364,8 +1382,8 @@ bool Backend::loadAuthDll()
 
     if (!m_funcs->fn_get_protocol_version ||
         !m_funcs->fn_get_abi_version ||
-        m_funcs->fn_get_protocol_version() != kExpectedAuthProtocolVersion ||
-        m_funcs->fn_get_abi_version() != kExpectedAuthAbiVersion) {
+        !NBVmp_Injector_AuthAbiMatches(m_funcs->fn_get_protocol_version(),
+                                       m_funcs->fn_get_abi_version())) {
         m_logModel->append("[ERR] Auth DLL 协议版本不兼容");
         QString msg = QString("NoteBotAuth.dll 协议版本不兼容。\n"
                               "\n期望协议: %1 / ABI: %2\n"
@@ -1448,8 +1466,8 @@ bool Backend::loadModelDll()
         setModelReplacementStatus(QStringLiteral("失败"));
         return false;
     }
-    if (m_modelFuncs->fn_get_protocol_version() != kExpectedModelProtocolVersion ||
-        m_modelFuncs->fn_get_abi_version() != kExpectedModelAbiVersion) {
+    if (!NBVmp_Injector_ModelAbiMatches(m_modelFuncs->fn_get_protocol_version(),
+                                        m_modelFuncs->fn_get_abi_version())) {
         m_logModel->append(QStringLiteral("[MODEL] NoteBotModel.dll 协议版本不兼容"));
         delete m_modelFuncs;
         m_modelFuncs = nullptr;

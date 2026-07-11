@@ -43,6 +43,21 @@ NB_NOINLINE bool NBVmp_Verify_ReplayEntryMatches(const QString &ticketId,
                                                  const QString &entryTicketSha256);
 NB_NOINLINE bool NBVmp_Verify_ResultHmacEquals(const QString &expectedLowerHex,
                                                const QString &actualLowerHex);
+NB_NOINLINE bool NBVmp_Verify_SignDevicePayload(const QByteArray &privateKeyBlob,
+                                                const QByteArray &payloadBytes,
+                                                ::NBAuth::FixedSig256 &outSignature);
+NB_NOINLINE bool NBVmp_Verify_TicketResponseReady(const QString &serverTicketPayload,
+                                                  const QString &serverTicketSignature);
+NB_NOINLINE bool NBVmp_Verify_WrapperKeyReady(const QByteArray &wrapperKey);
+NB_NOINLINE bool NBVmp_Verify_InjectResultEnvelopeMatches(const QString &magic,
+                                                          int version,
+                                                          const QString &expectedSessionId,
+                                                          const QString &sessionId,
+                                                          const QString &expectedTicketId,
+                                                          const QString &ticketId,
+                                                          const QString &expectedTicketSha256,
+                                                          const QString &ticketSha256,
+                                                          const QString &resultHmac);
 NB_NOINLINE bool NBVmp_Verify_FinalAllow(bool signatureOk,
                                          bool targetPidOk,
                                          bool hashOk,

@@ -10,3 +10,8 @@ mutation	NBVmp_Injector_IsIpLiteralHost	updater	classify a download host before 
 mutation	NBVmp_Injector_SignatureToHex	updater	encode the device signature for canonical manifest fields
 virtualize	NBVmp_Injector_CanonicalJsonString	updater	assemble canonical manifest JSON before signing
 mutation	NBVmp_Injector_SafeArtifactFileName	updater	sanitize server artifact file name before cache write
+ultra	NBVmp_Injector_AuthAbiMatches	backend	gate Auth DLL loading on the expected protocol and ABI pair
+ultra	NBVmp_Injector_ModelAbiMatches	backend	gate Model DLL loading on the expected protocol and ABI pair
+ultra	NBVmp_Injector_ProtectedLicenseEnvelopeReady	updater	validate the protected local license envelope before DPAPI decrypt
+ultra	NBVmp_Injector_ManifestIdentityReady	updater	validate manifest identity and encrypted device-key prerequisites
+ultra	NBVmp_Injector_SignManifestPayload	updater	sign canonical manifest data with transient device private-key bytes

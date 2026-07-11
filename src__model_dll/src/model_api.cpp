@@ -703,6 +703,43 @@ NB_NOINLINE QString NBVmp_Model_NormalizeArmSize(const QString &value)
     return result;
 }
 
+NB_NOINLINE bool NBVmp_Model_RuntimeModeRequested(bool modelEnabled, bool armOverrideEnabled)
+{
+    NB_VMP_ULTRA("NB.Model.RuntimeModeRequested");
+    const bool requested = modelEnabled || armOverrideEnabled;
+    NB_VMP_END();
+    return requested;
+}
+
+NB_NOINLINE bool NBVmp_Model_ModelAssetsConfigured(const QString &geometryPath,
+                                                    const QString &texturePath)
+{
+    NB_VMP_VIRTUALIZE("NB.Model.ModelAssetsConfigured");
+    const bool configured = !geometryPath.isEmpty() && !texturePath.isEmpty();
+    NB_VMP_END();
+    return configured;
+}
+
+NB_NOINLINE bool NBVmp_Model_SkinDimensionsAllowed(int width, int height)
+{
+    NB_VMP_MUTATE("NB.Model.SkinDimensionsAllowed");
+    const bool allowed = (width == 64 && height == 64) ||
+                         (width == 128 && height == 128) ||
+                         (width == 256 && height == 256);
+    NB_VMP_END();
+    return allowed;
+}
+
+NB_NOINLINE bool NBVmp_Model_UsablePayloadReady(int width,
+                                                int height,
+                                                const QByteArray &skinRgba)
+{
+    NB_VMP_ULTRA("NB.Model.UsablePayloadReady");
+    const bool ready = width > 0 && height > 0 && !skinRgba.isEmpty();
+    NB_VMP_END();
+    return ready;
+}
+
 bool readTextFile(const QString &path, QString *out, QString *error)
 {
     QFile file(path);
@@ -766,7 +803,7 @@ bool loadSkin(PayloadConfig *cfg, QString *error)
         return false;
     }
     const QSize size = image.size();
-    if (!(size == QSize(64, 64) || size == QSize(128, 128) || size == QSize(256, 256))) {
+    if (!NBVmp_Model_SkinDimensionsAllowed(size.width(), size.height())) {
         if (error) {
             *error = QStringLiteral("皮肤 PNG 必须是 64x64 / 128x128 / 256x256，当前是 %1x%2")
                          .arg(size.width())
@@ -807,7 +844,7 @@ std::optional<PayloadConfig> parseConfig(const char *json, QString *error)
     cfg.processTimeoutMs = obj.value(QStringLiteral("process_timeout_ms")).toInt(cfg.processTimeoutMs);
     cfg.hookTimeoutMs = obj.value(QStringLiteral("hook_timeout_ms")).toInt(cfg.hookTimeoutMs);
     cfg.hitTimeoutMs = obj.value(QStringLiteral("hit_timeout_ms")).toInt(cfg.hitTimeoutMs);
-    if (!cfg.modelEnabled && !cfg.armOverrideEnabled) {
+    if (!NBVmp_Model_RuntimeModeRequested(cfg.modelEnabled, cfg.armOverrideEnabled)) {
         if (error) {
             *error = QStringLiteral("model runtime feature disabled");
         }
@@ -827,7 +864,7 @@ std::optional<PayloadConfig> parseConfig(const char *json, QString *error)
         return cfg;
     }
     // geometry + texture both required
-    if (cfg.geometryPath.isEmpty() || cfg.texturePath.isEmpty()) {
+    if (!NBVmp_Model_ModelAssetsConfigured(cfg.geometryPath, cfg.texturePath)) {
         if (error) {
             *error = QStringLiteral("缺少 geometry_path 或 texture_path");
         }
@@ -842,7 +879,7 @@ std::optional<PayloadConfig> parseConfig(const char *json, QString *error)
     if (!loadSkin(&cfg, error) || !parseGeometryInfo(&cfg, error)) {
         return std::nullopt;
     }
-    if (cfg.skinWidth <= 0 || cfg.skinHeight <= 0 || cfg.skinRgba.isEmpty()) {
+    if (!NBVmp_Model_UsablePayloadReady(cfg.skinWidth, cfg.skinHeight, cfg.skinRgba)) {
         if (error) {
             *error = QStringLiteral("皮肤尺寸或数据无效");
         }

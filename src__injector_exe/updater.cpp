@@ -17,6 +17,7 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QtGlobal>
+#include <algorithm>
 #include <climits>
 #include <windows.h>
 #include <winhttp.h>
@@ -215,6 +216,51 @@ bool dpapiUnprotectMachine(const QByteArray &ciphertext, QByteArray &plaintext)
     return true;
 }
 
+NB_NOINLINE bool NBVmp_Injector_ProtectedLicenseEnvelopeReady(const QByteArray &raw)
+{
+    NB_VMP_ULTRA("NB.Injector.ProtectedLicenseEnvelopeReady");
+    const bool ok = raw.size() >= 8 && std::memcmp(raw.constData(), "NBV3", 4) == 0;
+    NB_VMP_END();
+    return ok;
+}
+
+NB_NOINLINE bool NBVmp_Injector_ManifestIdentityReady(const QString &keyId,
+                                                       const QString &deviceId,
+                                                       const QString &lastVerifiedAtUtc,
+                                                       int serverPubkeyVersion,
+                                                       const QString &serverPubkeyFingerprint,
+                                                       const QByteArray &privateBlob)
+{
+    NB_VMP_ULTRA("NB.Injector.ManifestIdentityReady");
+    const bool ok = !keyId.isEmpty() && !deviceId.isEmpty() && !lastVerifiedAtUtc.isEmpty() &&
+                    serverPubkeyVersion > 0 && !serverPubkeyFingerprint.isEmpty() &&
+                    !privateBlob.isEmpty();
+    NB_VMP_END();
+    return ok;
+}
+
+NB_NOINLINE bool NBVmp_Injector_SignManifestPayload(const QByteArray &privateKeyBlob,
+                                                     const QByteArray &payloadBytes,
+                                                     NBAuth::FixedSig256 &signature)
+{
+    NB_VMP_ULTRA("NB.Injector.SignManifestPayload");
+    if (privateKeyBlob.isEmpty() || payloadBytes.isEmpty()) {
+        NB_VMP_END();
+        return false;
+    }
+    NBAuth::ByteVector privateVec(
+        reinterpret_cast<const uint8_t *>(privateKeyBlob.constData()),
+        reinterpret_cast<const uint8_t *>(privateKeyBlob.constData()) + privateKeyBlob.size());
+    const bool ok = NBAuth::RsaSignSha256Blob(
+        privateVec,
+        reinterpret_cast<const uint8_t *>(payloadBytes.constData()),
+        static_cast<size_t>(payloadBytes.size()),
+        signature);
+    std::fill(privateVec.begin(), privateVec.end(), 0);
+    NB_VMP_END();
+    return ok;
+}
+
 bool loadProtectedLicenseObject(QJsonObject &out)
 {
     QFile file(updateStateLicensePath());
@@ -223,7 +269,7 @@ bool loadProtectedLicenseObject(QJsonObject &out)
     }
     const QByteArray raw = file.readAll();
     file.close();
-    if (raw.size() < 8 || std::memcmp(raw.constData(), "NBV3", 4) != 0) {
+    if (!NBVmp_Injector_ProtectedLicenseEnvelopeReady(raw)) {
         return false;
     }
 
@@ -264,8 +310,12 @@ bool buildManifestAuthContext(const QString &currentMainVersion,
         license.value(QStringLiteral("server_pubkey_fingerprint")).toString().trimmed();
     const QByteArray privateBlob = QByteArray::fromBase64(
         license.value(QStringLiteral("device_private_key_dpapi_blob_b64")).toString().toUtf8());
-    if (keyId.isEmpty() || deviceId.isEmpty() || lastVerifiedAtUtc.isEmpty() ||
-        serverPubkeyVersion <= 0 || serverPubkeyFingerprint.isEmpty() || privateBlob.isEmpty()) {
+    if (!NBVmp_Injector_ManifestIdentityReady(keyId,
+                                               deviceId,
+                                               lastVerifiedAtUtc,
+                                               serverPubkeyVersion,
+                                               serverPubkeyFingerprint,
+                                               privateBlob)) {
         return false;
     }
 
@@ -302,15 +352,14 @@ bool buildManifestAuthContext(const QString &currentMainVersion,
             {QStringLiteral("protocol_version"), 3},
         });
 
-    const NBAuth::ByteVector privateVec(
-        reinterpret_cast<const uint8_t *>(privateKeyBlob.constData()),
-        reinterpret_cast<const uint8_t *>(privateKeyBlob.constData()) + privateKeyBlob.size());
     NBAuth::FixedSig256 signature{};
     const QByteArray canonicalUtf8 = canonical.toUtf8();
-    if (!NBAuth::RsaSignSha256Blob(privateVec,
-                                   reinterpret_cast<const uint8_t *>(canonicalUtf8.constData()),
-                                   static_cast<size_t>(canonicalUtf8.size()),
-                                   signature)) {
+    const bool signedManifest = NBVmp_Injector_SignManifestPayload(
+        privateKeyBlob,
+        canonicalUtf8,
+        signature);
+    privateKeyBlob.fill('\0');
+    if (!signedManifest) {
         return false;
     }
 

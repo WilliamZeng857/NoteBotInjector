@@ -30,4 +30,8 @@ mutation	NBVmp_Verify_DllShaMatches	protected_verify_ops	compare expected DLL sh
 ultra	NBVmp_Verify_TtlElapsed	protected_verify_ops	enforce local wrapper ttl window for inject ticket use
 ultra	NBVmp_Verify_ReplayEntryMatches	protected_verify_ops	match replay-cache ticket identity against the current ticket
 ultra	NBVmp_Verify_ResultHmacEquals	protected_verify_ops	compare expected and actual result hmac in the protected verify path
+ultra	NBVmp_Verify_SignDevicePayload	protected_verify_ops	sign a canonical request using transient device private-key bytes
+ultra	NBVmp_Verify_TicketResponseReady	protected_verify_ops	validate the received server ticket response envelope before wrapping
+ultra	NBVmp_Verify_WrapperKeyReady	protected_verify_ops	validate the derived local ticket wrapper key before encryption
+ultra	NBVmp_Verify_InjectResultEnvelopeMatches	protected_verify_ops	bind a returned inject result to the pending session and ticket
 ultra	NBVmp_Verify_FinalAllow	protected_verify_ops	guard the final allow branch after all protected inject-ticket checks pass

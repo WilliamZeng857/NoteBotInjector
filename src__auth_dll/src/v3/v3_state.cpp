@@ -1697,7 +1697,7 @@ bool StateManager::issueInjectTicketLocked(const QJsonObject &request,
     QString serverTicketSignature =
         request.value(QStringLiteral("server_ticket_signature")).toString().trimmed().toLower();
 
-    if (serverTicketPayload.isEmpty() || serverTicketSignature.isEmpty()) {
+    if (!Protected::NBVmp_Verify_TicketResponseReady(serverTicketPayload, serverTicketSignature)) {
         QString signatureHex;
         QString nonceHex;
         QString timestampUtc;
@@ -1771,7 +1771,7 @@ bool StateManager::issueInjectTicketLocked(const QJsonObject &request,
         ticketId = rpcResp.ticketId;
         m_snapshot.networkAvailable = true;
         m_snapshot.lastError.clear();
-        if (serverTicketPayload.isEmpty() || serverTicketSignature.isEmpty()) {
+        if (!Protected::NBVmp_Verify_TicketResponseReady(serverTicketPayload, serverTicketSignature)) {
             rc = kRcTicketRequestFailed;
             if (message) {
                 *message = QStringLiteral("缺少服务端票据");
@@ -1784,7 +1784,7 @@ bool StateManager::issueInjectTicketLocked(const QJsonObject &request,
         Protected::NBVmp_Ticket_ComputeTicketSha256(serverTicketPayload);
     const QByteArray wrapperKey =
         Protected::NBVmp_Ticket_DeriveWrapperKey(sessionId, ticketSha256);
-    if (wrapperKey.size() != static_cast<int>(::NBAuth::AES_GCM_KEY_SIZE)) {
+    if (!Protected::NBVmp_Verify_WrapperKeyReady(wrapperKey)) {
         rc = kRcTicketWriteFailed;
         if (message) {
             *message = QStringLiteral("票据包装密钥派生失败");
@@ -2056,12 +2056,16 @@ bool StateManager::consumeInjectResultLocked(QJsonObject &data,
     const QString resultHmac =
         obj.value(QStringLiteral("result_hmac")).toString().trimmed().toLower();
 
-    if (magic != QString::fromLatin1(kResultMagic) ||
-        version != 3 ||
-        sessionId != m_pendingTicket.sessionId ||
-        ticketId != m_pendingTicket.ticketId ||
-        ticketSha256 != m_pendingTicket.ticketSha256 ||
-        resultHmac.isEmpty()) {
+    if (!Protected::NBVmp_Verify_InjectResultEnvelopeMatches(
+            magic,
+            version,
+            m_pendingTicket.sessionId,
+            sessionId,
+            m_pendingTicket.ticketId,
+            ticketId,
+            m_pendingTicket.ticketSha256,
+            ticketSha256,
+            resultHmac)) {
         rc = kRcResultInvalid;
         if (message) {
             *message = QStringLiteral("结果文件无效");
@@ -2583,13 +2587,12 @@ bool StateManager::signCanonicalPayloadLocked(const QString &payloadJson,
 
     ::NBAuth::FixedSig256 signature{};
     const QByteArray payloadBytes = payloadJson.toUtf8();
-    const ::NBAuth::ByteVector blobVec(
-        reinterpret_cast<const uint8_t *>(privateBlob.constData()),
-        reinterpret_cast<const uint8_t *>(privateBlob.constData()) + privateBlob.size());
-    if (!::NBAuth::RsaSignSha256Blob(blobVec,
-                                     reinterpret_cast<const uint8_t *>(payloadBytes.constData()),
-                                     static_cast<size_t>(payloadBytes.size()),
-                                     signature)) {
+    const bool signedPayload = Protected::NBVmp_Verify_SignDevicePayload(
+        privateBlob,
+        payloadBytes,
+        signature);
+    privateBlob.fill('\0');
+    if (!signedPayload) {
         if (error) {
             *error = QStringLiteral("rsa_sign_failed");
         }
