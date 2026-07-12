@@ -138,6 +138,7 @@ struct RpcIssueTicketRequest {
 
 struct RpcIssueTicketResponse {
     QString status;
+    QString message;
     QString sessionId;
     QString ticketId;
     QString serverTicketPayload;
@@ -168,6 +169,7 @@ struct RpcReportResultRequest {
 
 struct RpcReportResultResponse {
     QString status;
+    QString message;
     bool accepted = false;
 };
 

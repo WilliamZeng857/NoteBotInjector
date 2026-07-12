@@ -3007,6 +3007,21 @@ void Backend::doInject()
                 }
             });
         if (!injected) {
+            const QJsonObject finalizeReq = QJsonObject{
+                {QStringLiteral("status"), QStringLiteral("inject_failed")},
+                {QStringLiteral("reason"), QStringLiteral("inject_failed:remote_inject_failed")}
+            };
+            const QJsonObject finalizeResp = parseDllJsonObject(
+                callDll(QStringLiteral("finalize_inject_failure_v3"),
+                        QString::fromUtf8(QJsonDocument(finalizeReq).toJson(QJsonDocument::Compact))));
+            const QJsonObject reportResp =
+                parseDllJsonObject(callDll(QStringLiteral("report_inject_result_v3")));
+            logFromThread(QString("[AUTH] %1").arg(
+                finalizeResp.value(QStringLiteral("message")).toString(
+                    QStringLiteral("待处理票据作废失败"))));
+            logFromThread(QString("[AUTH] %1").arg(
+                reportResp.value(QStringLiteral("message")).toString(
+                    QStringLiteral("结果上报失败"))));
             fail(QStringLiteral("注入失败"),
                  72,
                  QStringLiteral("[AUTH] 业务 DLL 注入失败"));
@@ -3043,7 +3058,20 @@ void Backend::doInject()
                                   .arg(consumeData.value(QStringLiteral("reason")).toString()));
                 const QJsonObject reportResp =
                     parseDllJsonObject(callDll(QStringLiteral("report_inject_result_v3")));
-                Q_UNUSED(reportResp);
+                const int reportRc = reportResp.value(QStringLiteral("rc")).toInt(NB_ERR_OTHER);
+                const bool reportAccepted =
+                    reportResp.value(QStringLiteral("data")).toObject()
+                        .value(QStringLiteral("accepted")).toBool(false);
+                if (reportRc != 0 || !reportAccepted) {
+                    fail(QStringLiteral("结果上报失败"),
+                         95,
+                         QString("[AUTH] 注入结果上报失败: %1 (code=%2)")
+                             .arg(describeV3Rc(
+                                 reportRc,
+                                 reportResp.value(QStringLiteral("message")).toString()))
+                             .arg(reportRc));
+                    return;
+                }
                 Q_UNUSED(consumeMessage);
                 QMetaObject::invokeMethod(this, [this]() {
                     syncStatusFromDll();

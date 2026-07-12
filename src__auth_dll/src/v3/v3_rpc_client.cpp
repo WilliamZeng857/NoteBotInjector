@@ -354,6 +354,7 @@ bool RpcClientV3::issueInjectTicket(const RpcIssueTicketRequest &request,
     }
 
     response.status = obj.value(QStringLiteral("status")).toString();
+    response.message = obj.value(QStringLiteral("msg")).toString();
     response.sessionId = obj.value(QStringLiteral("session_id")).toString().trimmed();
     response.ticketId = obj.value(QStringLiteral("ticket_id")).toString().trimmed();
     response.serverTicketPayload =
@@ -404,6 +405,7 @@ bool RpcClientV3::reportInjectResult(const RpcReportResultRequest &request,
     }
 
     response.status = obj.value(QStringLiteral("status")).toString();
+    response.message = obj.value(QStringLiteral("msg")).toString();
     response.accepted = obj.value(QStringLiteral("accepted")).toBool(false);
     return true;
 }

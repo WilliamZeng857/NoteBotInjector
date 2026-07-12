@@ -600,6 +600,8 @@ LocalPaths buildDefaultPaths()
         QDir(paths.stateDir).absoluteFilePath(QStringLiteral("inject_ticket_v3.dat"));
     paths.resultPath =
         QDir(paths.stateDir).absoluteFilePath(QStringLiteral("inject_result_v3.dat"));
+    paths.pendingReportPath =
+        QDir(paths.stateDir).absoluteFilePath(QStringLiteral("pending_inject_report_v3.dat"));
     paths.consumedTicketsPath =
         QDir(paths.stateDir).absoluteFilePath(QStringLiteral("consumed_tickets_v3.json"));
     return paths;
@@ -751,6 +753,58 @@ QJsonObject licenseRecordToJson(const LicenseRecord &record)
     return obj;
 }
 
+PendingReportContext pendingReportFromJson(const QJsonObject &obj)
+{
+    PendingReportContext report;
+    report.valid = obj.value(QStringLiteral("valid")).toBool(false);
+    report.keyId = obj.value(QStringLiteral("key_id")).toString().trimmed();
+    report.deviceId = obj.value(QStringLiteral("device_id")).toString().trimmed();
+    report.sessionId = obj.value(QStringLiteral("session_id")).toString().trimmed();
+    report.ticketId = obj.value(QStringLiteral("ticket_id")).toString().trimmed();
+    report.ticketSha256 = obj.value(QStringLiteral("ticket_sha256")).toString().trimmed().toLower();
+    report.status = obj.value(QStringLiteral("status")).toString().trimmed();
+    report.reason = obj.value(QStringLiteral("reason")).toString();
+    report.dllVersion = obj.value(QStringLiteral("dll_version")).toString();
+    report.processedTickMs = obj.value(QStringLiteral("processed_tick_ms")).toVariant().toLongLong();
+    report.grantedTier = obj.value(QStringLiteral("granted_tier")).toString().trimmed();
+    report.grantedFeatureFlags =
+        obj.value(QStringLiteral("granted_feature_flags")).toVariant().toLongLong();
+    report.verifiedDllSha256 =
+        obj.value(QStringLiteral("verified_dll_sha256")).toString().trimmed().toLower();
+    report.issuedAtServer = obj.value(QStringLiteral("issued_at_server")).toString().trimmed();
+    report.expiresAtServer = obj.value(QStringLiteral("expires_at_server")).toString().trimmed();
+    report.serverPubkeyVersion = obj.value(QStringLiteral("server_pubkey_version")).toInt(0);
+    report.serverPubkeyFingerprint =
+        obj.value(QStringLiteral("server_pubkey_fingerprint")).toString().trimmed();
+    report.verifiedAtUtc = obj.value(QStringLiteral("verified_at_utc")).toString().trimmed();
+    return report;
+}
+
+QJsonObject pendingReportToJson(const PendingReportContext &report)
+{
+    return QJsonObject{
+        {QStringLiteral("schema_version"), 3},
+        {QStringLiteral("valid"), report.valid},
+        {QStringLiteral("key_id"), report.keyId},
+        {QStringLiteral("device_id"), report.deviceId},
+        {QStringLiteral("session_id"), report.sessionId},
+        {QStringLiteral("ticket_id"), report.ticketId},
+        {QStringLiteral("ticket_sha256"), report.ticketSha256},
+        {QStringLiteral("status"), report.status},
+        {QStringLiteral("reason"), report.reason},
+        {QStringLiteral("dll_version"), report.dllVersion},
+        {QStringLiteral("processed_tick_ms"), report.processedTickMs},
+        {QStringLiteral("granted_tier"), report.grantedTier},
+        {QStringLiteral("granted_feature_flags"), report.grantedFeatureFlags},
+        {QStringLiteral("verified_dll_sha256"), report.verifiedDllSha256},
+        {QStringLiteral("issued_at_server"), report.issuedAtServer},
+        {QStringLiteral("expires_at_server"), report.expiresAtServer},
+        {QStringLiteral("server_pubkey_version"), report.serverPubkeyVersion},
+        {QStringLiteral("server_pubkey_fingerprint"), report.serverPubkeyFingerprint},
+        {QStringLiteral("verified_at_utc"), report.verifiedAtUtc},
+    };
+}
+
 int tierTextToCode(const QString &tier)
 {
     const QString normalized = tier.trimmed().toLower();
@@ -817,7 +871,13 @@ bool StateManager::initialize()
         settings.value(QStringLiteral("licenseKey")).toString());
 
     loadNameConfigLocked();
-    loadLicenseRecordLocked(nullptr);
+    if (loadLicenseRecordLocked(nullptr)) {
+        if (!loadPendingReportLocked(&error)) {
+            m_snapshot.lastError = error;
+        } else if (!retryPendingReportLocked(&error)) {
+            m_snapshot.lastError = error;
+        }
+    }
     m_initialized = true;
     return true;
 }
@@ -1270,6 +1330,7 @@ void StateManager::resetRuntimeState()
     QFile::remove(m_paths.licensePath);
     QFile::remove(m_paths.ticketPath);
     QFile::remove(m_paths.resultPath);
+    QFile::remove(m_paths.pendingReportPath);
     QFile::remove(m_paths.consumedTicketsPath);
     ensureConsumedTicketCacheLocked(nullptr);
     clearPendingTicketLocked();
@@ -1657,6 +1718,17 @@ bool StateManager::issueInjectTicketLocked(const QJsonObject &request,
                                            int &rc,
                                            QString *message)
 {
+    QString pendingReportMessage;
+    if (!retryPendingReportLocked(&pendingReportMessage)) {
+        rc = kRcReportFailed;
+        if (message) {
+            *message = pendingReportMessage.isEmpty()
+                ? QStringLiteral("上一轮注入结果尚未上报")
+                : QStringLiteral("上一轮注入结果尚未上报: %1").arg(pendingReportMessage);
+        }
+        return false;
+    }
+
     if (!hasVerifiedLicenseLocked()) {
         rc = kRcServerRejected;
         if (message) {
@@ -1757,11 +1829,14 @@ bool StateManager::issueInjectTicketLocked(const QJsonObject &request,
         const int statusRc = classifyServerStatusLocked(rpcResp.status);
         if (statusRc != kRcOk) {
             rc = statusRc == kRcOk ? kRcTicketRequestFailed : statusRc;
+            const QString serverMessage = rpcResp.message.trimmed();
             if (message) {
-                *message = QStringLiteral("票据请求失败");
+                *message = serverMessage.isEmpty()
+                    ? QStringLiteral("票据请求失败")
+                    : QStringLiteral("票据请求失败: %1").arg(serverMessage);
             }
             m_snapshot.networkAvailable = true;
-            m_snapshot.lastError = rpcResp.status;
+            m_snapshot.lastError = serverMessage.isEmpty() ? rpcResp.status : serverMessage;
             return false;
         }
 
@@ -1870,7 +1945,7 @@ bool StateManager::issueInjectTicketLocked(const QJsonObject &request,
     m_pendingTicket.targetPid = targetPid;
     m_pendingTicket.issuedTickMs = static_cast<quint64>(GetTickCount64());
     m_pendingTicket.wrapperKey = wrapperKey;
-    m_pendingReport = PendingReportContext{};
+    clearPendingReportLocked();
 
     data[QStringLiteral("session_id")] = sessionId;
     data[QStringLiteral("ticket_id")] = ticketId;
@@ -2109,9 +2184,6 @@ bool StateManager::consumeInjectResultLocked(QJsonObject &data,
         }
     }
 
-    QFile::remove(m_paths.resultPath);
-    QFile::remove(m_paths.ticketPath);
-
     data[QStringLiteral("session_id")] = sessionId;
     data[QStringLiteral("ticket_id")] = ticketId;
     data[QStringLiteral("status")] = status;
@@ -2127,6 +2199,8 @@ bool StateManager::consumeInjectResultLocked(QJsonObject &data,
     data[QStringLiteral("server_pubkey_fingerprint")] = serverPubkeyFingerprint;
     data[QStringLiteral("verified_at_utc")] = nowUtcIso();
     m_pendingReport.valid = true;
+    m_pendingReport.keyId = m_licenseRecord.keyId;
+    m_pendingReport.deviceId = m_licenseRecord.deviceId;
     m_pendingReport.sessionId = sessionId;
     m_pendingReport.ticketId = ticketId;
     m_pendingReport.ticketSha256 = ticketSha256;
@@ -2142,6 +2216,18 @@ bool StateManager::consumeInjectResultLocked(QJsonObject &data,
     m_pendingReport.serverPubkeyVersion = serverPubkeyVersion;
     m_pendingReport.serverPubkeyFingerprint = serverPubkeyFingerprint;
     m_pendingReport.verifiedAtUtc = data.value(QStringLiteral("verified_at_utc")).toString();
+    QString persistError;
+    if (!savePendingReportLocked(&persistError)) {
+        rc = kRcResultInvalid;
+        if (message) {
+            *message = QStringLiteral("待上报注入结果持久化失败");
+        }
+        m_snapshot.lastError = persistError;
+        return false;
+    }
+
+    QFile::remove(m_paths.resultPath);
+    QFile::remove(m_paths.ticketPath);
     clearPendingTicketLocked();
 
     rc = kRcOk;
@@ -2196,9 +2282,6 @@ bool StateManager::finalizePendingInjectFailureLocked(const QString &status,
         }
     }
 
-    QFile::remove(m_paths.ticketPath);
-    QFile::remove(m_paths.resultPath);
-
     data[QStringLiteral("session_id")] = m_pendingTicket.sessionId;
     data[QStringLiteral("ticket_id")] = m_pendingTicket.ticketId;
     data[QStringLiteral("ticket_sha256")] = m_pendingTicket.ticketSha256;
@@ -2208,6 +2291,8 @@ bool StateManager::finalizePendingInjectFailureLocked(const QString &status,
     data[QStringLiteral("verified_at_utc")] = nowUtcIso();
 
     m_pendingReport.valid = true;
+    m_pendingReport.keyId = m_licenseRecord.keyId;
+    m_pendingReport.deviceId = m_licenseRecord.deviceId;
     m_pendingReport.sessionId = m_pendingTicket.sessionId;
     m_pendingReport.ticketId = m_pendingTicket.ticketId;
     m_pendingReport.ticketSha256 = m_pendingTicket.ticketSha256;
@@ -2223,6 +2308,18 @@ bool StateManager::finalizePendingInjectFailureLocked(const QString &status,
     m_pendingReport.serverPubkeyVersion = m_licenseRecord.serverPubkeyVersion;
     m_pendingReport.serverPubkeyFingerprint = m_licenseRecord.serverPubkeyFingerprint;
     m_pendingReport.verifiedAtUtc = data.value(QStringLiteral("verified_at_utc")).toString();
+    QString persistError;
+    if (!savePendingReportLocked(&persistError)) {
+        rc = kRcResultInvalid;
+        if (message) {
+            *message = QStringLiteral("待上报失败结果持久化失败");
+        }
+        m_snapshot.lastError = persistError;
+        return false;
+    }
+
+    QFile::remove(m_paths.ticketPath);
+    QFile::remove(m_paths.resultPath);
     clearPendingTicketLocked();
 
     rc = kRcOk;
@@ -2240,6 +2337,14 @@ bool StateManager::reportInjectResultLocked(QJsonObject &data,
         rc = kRcResultInvalid;
         if (message) {
             *message = QStringLiteral("当前没有待上报的注入结果");
+        }
+        return false;
+    }
+    if (m_pendingReport.keyId != m_licenseRecord.keyId ||
+        m_pendingReport.deviceId != m_licenseRecord.deviceId) {
+        rc = kRcResultInvalid;
+        if (message) {
+            *message = QStringLiteral("待上报结果不属于当前设备");
         }
         return false;
     }
@@ -2344,10 +2449,15 @@ bool StateManager::reportInjectResultLocked(QJsonObject &data,
         !rpcResp.accepted) {
         rc = kRcReportFailed;
         m_snapshot.networkAvailable = true;
-        m_snapshot.lastError = rpcResp.status;
+        const QString serverMessage = rpcResp.message.trimmed();
+        m_snapshot.lastError = serverMessage.isEmpty() ? rpcResp.status : serverMessage;
         data[QStringLiteral("accepted")] = false;
+        data[QStringLiteral("server_status")] = rpcResp.status;
+        data[QStringLiteral("server_msg")] = serverMessage;
         if (message) {
-            *message = QStringLiteral("结果上报失败");
+            *message = serverMessage.isEmpty()
+                ? QStringLiteral("结果上报失败")
+                : QStringLiteral("结果上报失败: %1").arg(serverMessage);
         }
         return false;
     }
@@ -2355,7 +2465,7 @@ bool StateManager::reportInjectResultLocked(QJsonObject &data,
     data[QStringLiteral("accepted")] = true;
     m_snapshot.networkAvailable = true;
     m_snapshot.lastError.clear();
-    m_pendingReport = PendingReportContext{};
+    clearPendingReportLocked();
     rc = kRcOk;
     if (message) {
         *message = QStringLiteral("结果上报成功");
@@ -2659,6 +2769,70 @@ bool StateManager::saveLicenseRecordLocked(const LicenseRecord &record, QString 
     return saveProtectedLicenseJson(m_paths.licensePath, licenseRecordToJson(record), error);
 }
 
+bool StateManager::loadPendingReportLocked(QString *error)
+{
+    m_pendingReport = PendingReportContext{};
+    if (!QFile::exists(m_paths.pendingReportPath)) {
+        return true;
+    }
+
+    QJsonObject obj;
+    if (!unwrapProtectedLicenseJson(m_paths.pendingReportPath, obj, error)) {
+        return false;
+    }
+
+    const PendingReportContext report = pendingReportFromJson(obj);
+    if (!report.valid || report.keyId.isEmpty() || report.deviceId.isEmpty() ||
+        report.sessionId.isEmpty() || report.ticketId.isEmpty() || report.status.isEmpty()) {
+        if (error) {
+            *error = QStringLiteral("pending_report_invalid");
+        }
+        return false;
+    }
+
+    if (report.keyId != m_licenseRecord.keyId || report.deviceId != m_licenseRecord.deviceId) {
+        QFile::remove(m_paths.pendingReportPath);
+        return true;
+    }
+
+    m_pendingReport = report;
+    return true;
+}
+
+bool StateManager::savePendingReportLocked(QString *error)
+{
+    if (!m_pendingReport.valid) {
+        QFile::remove(m_paths.pendingReportPath);
+        return true;
+    }
+    if (!ensureDirectoriesLocked(error)) {
+        return false;
+    }
+    return saveProtectedLicenseJson(m_paths.pendingReportPath,
+                                    pendingReportToJson(m_pendingReport),
+                                    error);
+}
+
+bool StateManager::retryPendingReportLocked(QString *message)
+{
+    if (!m_pendingReport.valid) {
+        return true;
+    }
+
+    QJsonObject data;
+    int rc = kRcReportFailed;
+    QString reportMessage;
+    if (reportInjectResultLocked(data, rc, &reportMessage)) {
+        return true;
+    }
+
+    if (message) {
+        *message = reportMessage.isEmpty() ? QStringLiteral("上一轮注入结果尚未上报")
+                                            : reportMessage;
+    }
+    return false;
+}
+
 bool StateManager::createOrRefreshPendingLicenseLocked(const QString &normalizedKey,
                                                        QString *statusMessage,
                                                        QString *error)
@@ -2860,6 +3034,7 @@ void StateManager::clearDerivedStateLocked()
 {
     m_licenseRecord = LicenseRecord{};
     clearPendingTicketLocked();
+    clearPendingReportLocked();
     m_snapshot.active = false;
     m_snapshot.online = false;
     m_snapshot.kicked = false;
@@ -2936,6 +3111,12 @@ bool StateManager::hasVerifiedLicenseLocked() const
 void StateManager::clearPendingTicketLocked()
 {
     m_pendingTicket = PendingTicketContext{};
+}
+
+void StateManager::clearPendingReportLocked()
+{
+    m_pendingReport = PendingReportContext{};
+    QFile::remove(m_paths.pendingReportPath);
 }
 
 void StateManager::loadNameConfigLocked()

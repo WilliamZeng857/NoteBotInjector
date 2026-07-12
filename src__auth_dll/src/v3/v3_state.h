@@ -42,6 +42,7 @@ struct LocalPaths {
     QString licensePath;
     QString ticketPath;
     QString resultPath;
+    QString pendingReportPath;
     QString consumedTicketsPath;
 };
 
@@ -114,6 +115,8 @@ struct PendingTicketContext {
 
 struct PendingReportContext {
     bool valid = false;
+    QString keyId;
+    QString deviceId;
     QString sessionId;
     QString ticketId;
     QString ticketSha256;
@@ -206,6 +209,9 @@ private:
                             QString *message = nullptr);
     bool loadLicenseRecordLocked(QString *error = nullptr);
     bool saveLicenseRecordLocked(const LicenseRecord &record, QString *error = nullptr);
+    bool loadPendingReportLocked(QString *error = nullptr);
+    bool savePendingReportLocked(QString *error = nullptr);
+    bool retryPendingReportLocked(QString *message = nullptr);
     bool createOrRefreshPendingLicenseLocked(const QString &normalizedKey,
                                              QString *statusMessage,
                                              QString *error = nullptr);
@@ -244,6 +250,7 @@ private:
                                             QString *message = nullptr);
     void normalizeReplayEntriesLocked(QJsonArray &entries) const;
     void clearPendingTicketLocked();
+    void clearPendingReportLocked();
 
     mutable std::mutex m_mutex;
     LocalPaths m_paths;
