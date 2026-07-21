@@ -1078,10 +1078,8 @@ Window {
                 Item {
                     visible: mainUI.detailPanel !== "settings"
                     Layout.fillWidth: true
-                    Layout.fillHeight: false
-                    Layout.preferredHeight: 150
+                    Layout.fillHeight: true
                     Layout.minimumHeight: 140
-                    Layout.maximumHeight: 170
 
                     Text {
                         x: 4
@@ -1207,12 +1205,6 @@ Window {
                             TapHandler { onTapped: backend.selectProcess(model.pid) }
                         }
                     }
-                }
-
-                Item {
-                    visible: mainUI.detailPanel !== "settings"
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
                 }
 
                 Rectangle {

@@ -42,12 +42,43 @@ QHash<int, QByteArray> ProcessModel::roleNames() const
 
 void ProcessModel::updateList(const QList<ProcessItem> &items, uint selectedPid)
 {
-    beginResetModel();
-    m_items = items;
-    for (auto &it : m_items) {
-        it.selected = (it.pid == selectedPid);
+    // Check if the list structure changed (different pids or order)
+    bool structureChanged = (m_items.size() != items.size());
+    if (!structureChanged) {
+        for (int i = 0; i < m_items.size(); ++i) {
+            if (m_items[i].pid != items[i].pid) {
+                structureChanged = true;
+                break;
+            }
+        }
     }
-    endResetModel();
+
+    if (structureChanged) {
+        // Full reset only when processes are added/removed/reordered
+        beginResetModel();
+        m_items = items;
+        for (auto &it : m_items) {
+            it.selected = (it.pid == selectedPid);
+        }
+        endResetModel();
+    } else {
+        // Structure unchanged — only emit dataChanged for modified fields
+        for (int i = 0; i < m_items.size(); ++i) {
+            const auto &ni = items[i];
+            auto &cur = m_items[i];
+            bool changed = false;
+            if (cur.exe != ni.exe) { cur.exe = ni.exe; changed = true; }
+            if (cur.title != ni.title) { cur.title = ni.title; changed = true; }
+            if (cur.hasWindow != ni.hasWindow) { cur.hasWindow = ni.hasWindow; changed = true; }
+            if (cur.path != ni.path) { cur.path = ni.path; changed = true; }
+            bool selChanged = (cur.selected != (ni.pid == selectedPid));
+            cur.selected = (ni.pid == selectedPid);
+            if (changed || selChanged) {
+                QModelIndex idx = index(i);
+                emit dataChanged(idx, idx);
+            }
+        }
+    }
 }
 
 void ProcessModel::setSelected(uint pid)
